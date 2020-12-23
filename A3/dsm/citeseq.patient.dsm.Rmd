@@ -1,0 +1,394 @@
+---
+title: "Clinical-based clustering of COVID patients"
+output: 
+  html_document:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+Cluster patients based on the following clinical parameters:
+
+Oxygen: SpO2/FiO2 ratio
+
+Inflammation: CRP, IL-6, TNF, IL-18 Neutrophil/lymphocyte ratio 
+
+IFN-I: IP-10
+
+coagulation/endothelial: D-dimer
+
+T-cell related: IFNg, CXCL9 (downstream of IFNg), iL-17, IL-4, IL-13
+
+Lymphopenia: lymphocyte counts (CBC)
+
+Tissue damage: LDH 
+```{r setup, include=FALSE}
+data.folder <- "input.data"
+output.folder <- "output/DSM"
+dir.create(output.folder,recursive = T)
+library(knitr)
+library(ggplot2)
+library(ggsci)
+library(ggpubr)
+library(ggfortify)
+library(Hmisc)
+library(GGally)
+library(plsRglm)
+knitr::opts_chunk$set(echo = TRUE)
+options(stringsAsFactors = FALSE)
+opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+
+
+load(file.path(data.folder,"covid19.metadata.paper1.RData"),verbose = T)
+```
+
+### Feature and Sample Filtering
+```{r clinical}
+paramaters.of.interest <- c("SpO2/FiO2","CRP","IL-6","TNF-a","TNF-b","IL-18/IL-1f4","ANC/ALC Ratio","IP-10","D-Dimer","IFN-Gamma","CXCL9/MIG","CXCL9/ MIG",
+                            "IL-17","IL-4","IL-13","Fibrinogen","Lymphocytes",#"Serology Spike","Serology Nucleocapsid"
+                            "Lactate Dehydrogenase (LDH)","Platelets (PLT)")#,"Neutrophils")
+batch.sample.lab.values.all <- subset(covid19.lab.results,subject_id %in% subset(covid19.samples,!is.na(batch))$subject_id 
+                                  & tolower(test_name) %in% tolower(paramaters.of.interest) & test_id != "Lymphocytes_pct")
+
+batch.sample.lab.values <- merge(batch.sample.lab.values.all,subset(covid19.samples,material_type == "PBMC"),#"Serum"),#
+                                 by.x=c("subject_id","days_from_admission_to_test"),by.y=c("subject_id","days_from_admission_to_sample_drawn"),
+                                 suffixes = c("",".duplicate"))
+batch.sample.lab.values <- batch.sample.lab.values[,grep("duplicate$",colnames(batch.sample.lab.values),invert = T)]
+batch.sample.lab.values.avg <- reshape2::dcast(batch.sample.lab.values,sample_bsi_id + subject_id + condition + sex + age + severity + 
+                                                 outcome + ever_admitted_to_icu + 
+                                                 days_from_symptom_onset_to_hospitalization + number_of_days_hospitalized + days_from_hospitalization_to_death +
+                                                 sample_label + visit + days_from_symptom_onset_to_test + days_from_admission_to_test + batch + test_order ~ test_id,
+                                               value.var = "test_value",fun.aggregate = function(x){mean(x,na.rm = T)})
+batch.sample.lab.values.avg <- batch.sample.lab.values.avg[order(batch.sample.lab.values.avg$test_order),]
+
+# use admission date if missing symptom onset
+batch.sample.lab.values.avg[is.na(batch.sample.lab.values.avg$days_from_symptom_onset_to_test),]$days_from_symptom_onset_to_test <-
+  batch.sample.lab.values.avg[is.na(batch.sample.lab.values.avg$days_from_symptom_onset_to_test),]$days_from_admission_to_test
+```
+
+### Clinical and cytokine parameters at first time point
+```{r initial.timepoint,out.width="800px",fig.height=6}
+batch.sample.lab.values.avg.T0 <- batch.sample.lab.values.avg[!duplicated(batch.sample.lab.values.avg$subject_id),]
+batch.sample.lab.values.avg.T0$severity.outcome <- paste0(batch.sample.lab.values.avg.T0$severity,"-",batch.sample.lab.values.avg.T0$outcome)
+severity.color <- ggsci::pal_jama()(4)
+names(severity.color) <- sort(unique(batch.sample.lab.values.avg.T0$severity.outcome))
+
+ggplot(batch.sample.lab.values.avg.T0,aes(visit,days_from_symptom_onset_to_test)) + geom_boxplot(outlier.shape = NA,width=0.5) + 
+  geom_point(pch=21,size=3,alpha=0.75,position = position_jitter(width=0.2,h=0),aes(fill=severity.outcome)) + 
+  theme_bw() + ggsci::scale_fill_jama() + ylab("Days from Symptom Onset")
+
+# remove samples >= 30 days from symptom onset
+max.days.since.syptom.onset <- 30
+cat("Removing samples >=",max.days.since.syptom.onset,"-",
+    subset(batch.sample.lab.values.avg.T0,days_from_symptom_onset_to_test >= max.days.since.syptom.onset)$subject_id)
+batch.sample.lab.values.avg.T0 <- subset(batch.sample.lab.values.avg.T0,days_from_symptom_onset_to_test < max.days.since.syptom.onset)
+
+ggplot(batch.sample.lab.values.avg.T0,aes(visit,days_from_admission_to_test)) + geom_boxplot(outlier.shape = NA,width=0.5) + 
+  geom_point(pch=21,size=3,alpha=0.75,position = position_jitter(w=0.25,h=0),aes(fill=severity.outcome)) + 
+  theme_bw() + ggsci::scale_fill_jama() + ylab("Days from Hospital Admission")
+
+batch.sample.lab.values.avg.T0.meta <- batch.sample.lab.values.avg.T0[,setdiff(colnames(batch.sample.lab.values.avg.T0),unique(batch.sample.lab.values$test_id))]
+rownames(batch.sample.lab.values.avg.T0.meta) <- batch.sample.lab.values.avg.T0.meta$subject_id
+batch.sample.lab.values.avg.T0.meta$severity.outcome <- paste0(batch.sample.lab.values.avg.T0.meta$severity,"-",batch.sample.lab.values.avg.T0.meta$outcome)
+batch.sample.lab.values.avg.T0 <- batch.sample.lab.values.avg.T0[,setdiff(colnames(batch.sample.lab.values.avg.T0),
+                                                                          colnames(batch.sample.lab.values.avg.T0.meta))]
+
+rownames(batch.sample.lab.values.avg.T0.meta) <- batch.sample.lab.values.avg.T0.meta$subject_id
+rownames(batch.sample.lab.values.avg.T0) <- batch.sample.lab.values.avg.T0.meta$subject_id
+colnames(batch.sample.lab.values.avg.T0) <- sapply(colnames(batch.sample.lab.values.avg.T0),function(x){unlist(strsplit(x,"_|\\.\\."))[1]})
+
+# transform to log10
+batch.sample.lab.values.avg.T0 <- log10(batch.sample.lab.values.avg.T0+0.01)
+
+pheatmap::pheatmap(scale(batch.sample.lab.values.avg.T0),
+                   annotation_row = batch.sample.lab.values.avg.T0.meta[,c("severity.outcome","age","sex",
+                                                                           "days_from_symptom_onset_to_test","days_from_admission_to_test")],
+                   color = viridis::inferno(101),fontsize = 6,
+                   annotation_colors = list(sex=c("F"="darkred","M"="darkblue"),severity.outcome=severity.color),main="All earliest time-point batch samples")
+
+# try to borrow from +/- 2 days
+day.margin <- 2
+batch.sample.lab.values.expanded <- data.frame()
+for (i in 1:nrow(batch.sample.lab.values.avg.T0.meta)) {
+  subj <- batch.sample.lab.values.avg.T0.meta$subject_id[i]
+  #cat(i,"-",subj,"\n")
+  days_from_admission <- batch.sample.lab.values.avg.T0.meta$days_from_admission_to_test[i]
+  tmp <- subset(batch.sample.lab.values.all,subject_id == subj &
+                  (days_from_admission_to_test == batch.sample.lab.values.avg.T0.meta$days_from_admission_to_test[i] |
+    (days_from_admission_to_test <= (days_from_admission + day.margin) & 
+      days_from_admission_to_test >= (days_from_admission - day.margin))))
+  tmp$target.day.diff <- abs(tmp$days_from_admission_to_test - days_from_admission)
+  #print(table(tmp$target.day.diff))
+  
+  tmp <- tmp[order(tmp$target.day.diff,decreasing = F),]
+  tmp$days_from_admission_to_test_id <- apply(tmp[,c("subject_id","test_id","days_from_admission_to_test")],1,paste0,collapse=":")
+  #tmp <- subset(tmp,days_from_symptom_onset_to_test_id %in% tmp[!duplicated(tmp[,c("subject_id","test_id")]),]$days_from_admission_to_test_id) # keep multiple values taken on the same closest day
+  tmp <- tmp[!duplicated(tmp[,c("subject_id","test_id")],fromLast = F),]
+  batch.sample.lab.values.expanded <- rbind(batch.sample.lab.values.expanded,tmp)
+}
+
+batch.sample.lab.values.expanded.avg <- reshape2::dcast(batch.sample.lab.values.expanded,subject_id ~ test_id,
+                                               value.var = "test_value",fun.aggregate = function(x){mean(x,na.rm = T)})
+rownames(batch.sample.lab.values.expanded.avg) <- batch.sample.lab.values.expanded.avg$subject_id
+batch.sample.lab.values.expanded.avg <- batch.sample.lab.values.expanded.avg[rownames(batch.sample.lab.values.avg.T0.meta),
+                                                                    intersect(colnames(batch.sample.lab.values.expanded.avg),batch.sample.lab.values.all$test_id)]
+
+
+# transform to log10
+batch.sample.lab.values.expanded.avg <- log10(batch.sample.lab.values.expanded.avg+0.01)
+
+pheatmap::pheatmap(scale(batch.sample.lab.values.expanded.avg),
+                   annotation_row = batch.sample.lab.values.avg.T0.meta[,c("severity.outcome","age","sex",
+                                                                           "days_from_symptom_onset_to_test","days_from_admission_to_test")],
+                   color = viridis::inferno(101),fontsize = 6,
+                   annotation_colors = list(sex=c("F"="darkred","M"="darkblue"),severity.outcome=severity.color),
+                   main="All earliest time-point batch samples (values from time point +/- 2 days)")
+
+# impute remaining missing data
+RNGkind(sample.kind = "Rounding") # ensure compatibility with versions prior to 3.6
+#set.seed(10276)
+set.seed(1087)
+batch.sample.lab.values.expanded.avg.imputed <- batch.sample.lab.values.expanded.avg
+imputed.obj <- aregImpute(formula = as.formula(paste0("~ ",paste0(colnames(batch.sample.lab.values.expanded.avg),collapse = " + "))), 
+                                                           data = batch.sample.lab.values.expanded.avg, n.impute = 5, type = "regression",nk = 0)
+imputed.values <- impute.transcan(imputed.obj,imputation = 1,data=batch.sample.lab.values.expanded.avg,list.out=TRUE)
+batch.sample.lab.values.expanded.avg.imputed[names(imputed.values)] <- imputed.values
+
+pheatmap::pheatmap(scale(batch.sample.lab.values.expanded.avg.imputed),
+                   annotation_row = batch.sample.lab.values.avg.T0.meta[,c("severity.outcome","age","sex",
+                                                                           "days_from_symptom_onset_to_test","days_from_admission_to_test")],
+                   color = viridis::inferno(101),fontsize = 6,
+                   annotation_colors = list(sex=c("F"="darkred","M"="darkblue"),severity.outcome=severity.color),
+                   main="All earliest time-point batch samples (values from time point +/- 2 days or imputed)")
+
+# correct for days from symptom onset or admission 
+correct.for <- "days_from_admission_to_test"
+batch.sample.lab.values.expanded.avg.imputed.corrected <- t(limma::removeBatchEffect(t(batch.sample.lab.values.expanded.avg.imputed),
+                  covariates = batch.sample.lab.values.avg.T0.meta[rownames(batch.sample.lab.values.expanded.avg.imputed),correct.for,drop=F]))
+
+parameter.labels <- unique(batch.sample.lab.values[,c("test_id","test_name")])
+rownames(parameter.labels) <- parameter.labels$test_id
+parameter.labels["ANC.ALC.Ratio_.ratio","test_name"] <- "Neutrophil/lymphocyte ratio (NLR)"
+parameter.labels["CRP","test_name"] <- "C-reactive protein (CRP)"
+parameter.labels["Lymphocytes_x10.3.uL","test_name"] <- "Lymphocyte count"
+parameter.labels["Platelets..PLT._x10.3.uL","test_name"] <- "Platelet count"
+parameter.labels$test_name <- gsub("/ ","/",parameter.labels$test_name,fixed = T)
+
+# merge back patients with multiple samples
+batch.sample.lab.values.expanded.avg.imputed.corrected <- 
+  aggregate(batch.sample.lab.values.expanded.avg.imputed.corrected,list(batch.sample.lab.values.avg.T0.meta$subject_id),mean)
+rownames(batch.sample.lab.values.expanded.avg.imputed.corrected) <- batch.sample.lab.values.expanded.avg.imputed.corrected$Group.1 
+batch.sample.lab.values.expanded.avg.imputed.corrected <- batch.sample.lab.values.expanded.avg.imputed.corrected[,-1]
+batch.sample.lab.values.avg.T0.meta <- batch.sample.lab.values.avg.T0.meta[match(rownames(batch.sample.lab.values.expanded.avg.imputed.corrected),
+                                                                                 batch.sample.lab.values.avg.T0.meta$subject_id),]
+
+# which were intubated?
+batch.sample.lab.values.avg.T0.meta$intubated <- batch.sample.lab.values.avg.T0.meta$subject_id %in%  
+  covid19.treatment[grep("int",covid19.treatment$treatment_notes,ignore.case = T),]$subject_id
+subject.labels <- gsub("HGR0000","P",rownames(batch.sample.lab.values.expanded.avg.imputed.corrected))
+subject.labels[batch.sample.lab.values.avg.T0.meta$ever_admitted_to_icu == T] <- 
+  paste0(subject.labels[batch.sample.lab.values.avg.T0.meta$ever_admitted_to_icu == T],"*")
+subject.labels[batch.sample.lab.values.avg.T0.meta$intubated == T] <- 
+  paste0(subject.labels[batch.sample.lab.values.avg.T0.meta$intubated == T],"^")
+
+pheatmap::pheatmap(scale(batch.sample.lab.values.expanded.avg.imputed.corrected),
+                   annotation_row = batch.sample.lab.values.avg.T0.meta[,c("severity.outcome"),drop=F],#,"WHO.ordinal.scale.at.time.of.sampling"),drop=F],
+                   #,"age","sex","batch","days_from_symptom_onset_to_test","days_from_admission_to_test")],
+                   #color = colorRampPalette(brewer.pal(8,"YlGnBu"))(34),
+                   color = viridis::cividis(34),
+                   breaks = c(-3,seq(-1.5,1.5,by=0.1),3),angle_col = 45,cutree_rows = 4,
+                   clustering_method = "ward.D",
+                   annotation_colors = list(sex=c("F"="darkred","M"="darkblue"),severity.outcome=severity.color),
+                   #main=paste0("Values from time point +/- 2 days or imputed corrected for ",correct.for),
+                   labels_row = subject.labels,cellwidth = 15,cellheight = 8,fontsize = 8,#file=file.path(data.folder,"plots","test2.pdf"),
+                   labels_col = parameter.labels[colnames(batch.sample.lab.values.expanded.avg.imputed.corrected),"test_name"])
+```
+
+# Classification model
+Select features associated with severity and use them to calculate DSM
+```{r model}
+severity.index <- c("Moderate-Alive"=1,"Severe-Alive"=2,"Critical-Alive"=3,"Critical-Deceased"=4)
+batch.sample.lab.values.expanded.avg.corrected <- t(limma::removeBatchEffect(t(batch.sample.lab.values.expanded.avg),
+                  covariates = batch.sample.lab.values.avg.T0.meta[rownames(batch.sample.lab.values.expanded.avg),correct.for,drop=F]))
+batch.sample.lab.values.expanded.avg.corrected <- batch.sample.lab.values.expanded.avg.corrected[rownames(batch.sample.lab.values.avg.T0.meta),
+                                                                          -grep("FiO2",colnames(batch.sample.lab.values.expanded.avg.corrected))]
+
+# leave-one-out modeling
+feature.importance <- data.frame()
+sample.scores <- data.frame()
+for (i in 1:nrow(batch.sample.lab.values.expanded.avg.corrected)) {
+  tryCatch({
+    modpls2 <- plsRglm(#factor(who.severity.index[batch.sample.lab.values.avg.T0.meta$WHO.severity.outcome[-i]]),
+                       factor(severity.index[batch.sample.lab.values.avg.T0.meta$severity.outcome[-i]]),
+                       batch.sample.lab.values.expanded.avg.corrected[-i,],1,modele="pls-glm-polr",pvals.expli=T,
+                       dataPredictY = batch.sample.lab.values.expanded.avg.corrected[i,,drop=F],verbose=F)
+    sample.scores <- rbind(sample.scores,data.frame(sample=rownames(batch.sample.lab.values.expanded.avg.corrected)[i],
+                                                    predicted=as.numeric(modpls2$ValsPredictYCat),
+                                                    #observed=who.severity.index[batch.sample.lab.values.avg.T0.meta$WHO.severity.outcome[i]]))
+                                                    observed=severity.index[batch.sample.lab.values.avg.T0.meta$severity.outcome[i]]))
+    feature.importance <- rbind(feature.importance,as.data.frame(t(modpls2$Std.Coeffs)))
+
+  }, error = function(e){warning(paste0("Error in sample",i,"\n"))})
+}
+cat("Contingency table:\n")
+table(sample.scores[,c("predicted","observed")])
+num.wrong <- sum(sample.scores$predicted != sample.scores$observed)
+cat("Number of misclassified samples:",num.wrong," (",100*num.wrong/nrow(sample.scores),"%)\n")
+ggplot(reshape::melt(feature.importance[,colnames(batch.sample.lab.values.expanded.avg.corrected)]),aes(variable,value)) + 
+  geom_boxplot() + geom_hline(yintercept = 0,linetype="dashed",color="red") +
+  theme_bw() + theme(axis.text.x = element_text(angle=90,hjust = 1,vjust = 0.5)) + ggtitle("ordinal logistic PLS leave-one-out models") + ylab("Coefficients")
+
+# permutation-based feature selection
+modpls2 <- plsRglm(factor(severity.index[batch.sample.lab.values.avg.T0.meta$severity.outcome]),
+                   batch.sample.lab.values.expanded.avg.corrected,1,modele="pls-glm-polr",pvals.expli=T)
+bootYT2 <- bootplsglm(modpls2, R=100, strata=unclass(factor(severity.index[batch.sample.lab.values.avg.T0.meta$severity.outcome])), sim="permutation")
+plots.confints.bootpls(confints.bootpls(bootYT2,typeBCa=FALSE), legendpos = "topright",xaxisticks=FALSE)
+boxplots.bootpls(bootYT2,xaxisticks=FALSE,ranget0=TRUE)
+
+#saveRDS(feature.importance,file.path(data.folder,"end.point.PLS.coefficients.RDS"))
+feature.median <- sort(abs(apply(feature.importance[,colnames(batch.sample.lab.values.expanded.avg.corrected)],2,median)))
+feature.sign <- as.factor(sign(apply(feature.importance[,colnames(batch.sample.lab.values.expanded.avg.corrected)],2,median))[names(feature.median)])
+feature.sd <- apply(feature.importance[,colnames(batch.sample.lab.values.expanded.avg.corrected)],2,sd)[names(feature.median)]
+feature.median
+
+names(feature.median) <- parameter.labels[names(feature.median),"test_name"]
+ggplot(data.frame(feature=factor(names(feature.median),levels = names(feature.median)),abs.median.coef=feature.median,coef.sd=feature.sd,sign=feature.sign),
+       aes(feature,-abs.median.coef*as.numeric(as.character(feature.sign)))) + geom_hline(yintercept = 0) + geom_bar(stat = "identity",fill="deepskyblue3") + 
+  geom_errorbar(aes(ymin=-abs.median.coef*as.numeric(as.character(feature.sign))-coef.sd,
+                ymax=-abs.median.coef*as.numeric(as.character(feature.sign))+coef.sd),width=.2,color="red") +
+  scale_fill_manual(name="direction",values=c("darkblue","lightblue")) +
+  theme_bw() + theme(axis.text.x=element_text(angle=45,hjust = 1,size=7)) + xlab("Parameter") + ylab("Median Coefficient") + ggtitle("PLS Model")
+
+# final model
+selected.num.features <- 8
+# heatmap using important features + oxygen
+important.features <- tail(names(feature.sign),selected.num.features)
+print(important.features)
+
+batch.sample.lab.values.avg.T0.meta$ever_admitted_to_icu <- as.character(batch.sample.lab.values.avg.T0.meta$ever_admitted_to_icu)
+pheatmap::pheatmap(scale(batch.sample.lab.values.expanded.avg.imputed.corrected[,important.features]),
+                   annotation_row = batch.sample.lab.values.avg.T0.meta[,c("severity.outcome","ever_admitted_to_icu","age","sex","batch",correct.for)],
+                   color = viridis::inferno(34),breaks = c(-3,seq(-1.5,1.5,by=0.1),3),fontsize = 6,
+                   annotation_colors = list(sex=c("F"="darkred","M"="darkblue"),severity.outcome=severity.color,
+                                            ever_admitted_to_icu=c("FALSE"="white","TRUE"="black")),
+                   cutree_rows = 4,
+                   main=paste0("All earliest batch samples (values from time point +/- 2 days or imputed corrected for ",correct.for,")"))
+
+# put oxygen back into PCA calculation
+important.features <- c(important.features,"SpO2.FiO2_.ratio")
+lab.pca <- prcomp(batch.sample.lab.values.expanded.avg.imputed.corrected[,important.features],scale. = T,center = T)
+pca.summary <- summary(lab.pca)
+
+row.annotation <- merge(batch.sample.lab.values.avg.T0.meta,lab.pca$x[,1:2],by="row.names")
+
+# flip sign of PC1 to use it as "severity" metric
+row.annotation$PC1 <- row.annotation$PC1*-1
+
+# violin plot by severity group
+comparisons <- gtools::combinations(4,2,names(severity.color))
+comparisons <- comparisons[comparisons[,1] != comparisons[,2],]
+comparisons <- lapply(1:nrow(comparisons),function(x){comparisons[x,]})
+row.annotation$severity.outcome <- factor(row.annotation$severity.outcome,levels=names(severity.index))
+ggviolin(row.annotation,x="severity.outcome",y="PC1", add = "boxplot",palette = c("#00A1D5FF","#B24745FF","#374E55FF","#DF8F44FF"),
+         fill="severity.outcome",add.params = list(fill="white"),xlab = "Severity",ylab="Disease Severity Metric (DSM)") + 
+  geom_point(alpha=0.25,size=2) + #scale_y_continuous(expand=expansion(add=c(0,1))) +
+  stat_compare_means(comparisons = comparisons,hide.ns = T,label = "p.signif",tip.length = 0,method = "wilcox.test") + 
+  theme(text = element_text(size=8)) 
+rownames(row.annotation) <- row.annotation$Row.names
+```
+
+
+### Serology for batch samples
+add serology data and create dsm object
+```{r}
+# serology at time point
+serology.values <- subset(covid19.lab.results,test_type == "Serology")
+serology.values$severity.outcome <- paste0(serology.values$severity,"-",serology.values$outcome)
+serology.values.wide <- reshape2::dcast(serology.values,subject_id + days_from_symptom_onset_to_test + days_from_admission_to_test ~ test_name,value.var="test_value",
+                                        fun.aggregate = mean)
+colnames(serology.values.wide) <- gsub(" Antibodies","",colnames(serology.values.wide))
+serology.values.wide$Nucleocapsid <- log10(serology.values.wide$Nucleocapsid+0.01)
+serology.values.wide$Spike <- log10(serology.values.wide$Spike+0.01)
+serology.values <- merge(covid19.patient.demo,serology.values.wide,by="subject_id",all.y=T)
+colnames(serology.values) <- gsub("test","serology",colnames(serology.values))
+
+# add individual parameters
+patient.data <- row.annotation#cbind(row.annotation,batch.sample.lab.values.expanded.avg.imputed[row.annotation$subject_id,important.features])
+batch.serology <- subset(serology.values,subject_id %in% patient.data$subject_id)
+
+# serology closest to PBMC time point
+batch.serology$sample.time.point <- patient.data[batch.serology$subject_id,]$days_from_admission_to_test
+batch.serology$days_from_sample_to_serology <- batch.serology$days_from_admission_to_serology - batch.serology$sample.time.point
+batch.serology <- batch.serology[order(abs(batch.serology$days_from_sample_to_serology)),]
+batch.serology.time.point <- batch.serology[!duplicated(batch.serology$subject_id),]
+patient.data <- cbind(patient.data,initial=batch.serology.time.point[match(patient.data$subject_id,batch.serology.time.point$subject_id),
+                                                  c("Nucleocapsid","Spike","days_from_sample_to_serology","days_from_admission_to_serology")])
+
+# serology peak titer
+batch.serology <- batch.serology[order(batch.serology$Nucleocapsid,decreasing = T),]
+batch.serology$peak.Nucleocapsid <- !duplicated(batch.serology$subject_id)
+Nucleocapsid.peak.titer <- batch.serology[!duplicated(batch.serology$subject_id),]
+patient.data <- cbind(patient.data,nucleocapsid.peak=Nucleocapsid.peak.titer[match(patient.data$subject_id,Nucleocapsid.peak.titer$subject_id),
+                                                  c("Nucleocapsid","Spike","days_from_sample_to_serology","days_from_admission_to_serology")])
+
+batch.serology <- batch.serology[order(batch.serology$Spike,decreasing = T),]
+batch.serology$peak.Spike <- !duplicated(batch.serology$subject_id)
+Spike.peak.titer <- batch.serology[!duplicated(batch.serology$subject_id),]
+patient.data <- cbind(patient.data,spike.peak=Spike.peak.titer[match(patient.data$subject_id,Spike.peak.titer$subject_id),
+                                                  c("Nucleocapsid","Spike","days_from_sample_to_serology","days_from_admission_to_serology")])
+
+# serology closest to discharge or death
+batch.serology$days_from_hospitalization_end_to_serology <- as.numeric(batch.serology$days_from_admission_to_serology - batch.serology$number_of_days_hospitalized)
+batch.serology[which(is.na(batch.serology$days_from_hospitalization_end_to_serology)),]$days_from_hospitalization_end_to_serology <- 
+  as.numeric(batch.serology$days_from_admission_to_serology - 
+               batch.serology$days_from_hospitalization_to_death)[is.na(batch.serology$days_from_hospitalization_end_to_serology)]
+batch.serology <- batch.serology[order(abs(batch.serology$days_from_hospitalization_end_to_serology)),]
+
+end.batch.serology <- batch.serology[!duplicated(batch.serology$subject_id),]
+patient.data <- cbind(patient.data,end=end.batch.serology[match(patient.data$subject_id,end.batch.serology$subject_id),
+                                                  c("Nucleocapsid","Spike","days_from_hospitalization_end_to_serology","days_from_admission_to_serology")])
+
+```
+
+### Severity by Sample
+WHO serverity score over time between DSM-high and DSM-low groups
+```{r WHO.score}
+who.score.df <- read.csv(file.path(data.folder,"pbmc.samples.csv"))
+who.score.df <- merge(who.score.df,subset(covid19.samples,material_type == "PBMC"),by = c("subject_id","sample_label","visit"),suffixes = c("",".dup"))
+who.score.df$DSM.group <- NA
+who.score.df[who.score.df$subject_id %in% subset(patient.data,PC1 < median(patient.data$PC1))$subject_id,"DSM.group"] <- "DSM-low"
+who.score.df[who.score.df$subject_id %in% subset(patient.data,PC1 > median(patient.data$PC1))$subject_id,"DSM.group"] <- "DSM-high"
+
+ggplot(subset(who.score.df,!is.na(DSM.group)),aes(days_from_symptom_onset_to_sample_drawn,WHO.ordinal.scale.at.time.of.sampling)) + 
+  geom_rect(aes(xmin=17,xmax=23,ymax=Inf,ymin=-Inf),fill="lightyellow2",alpha=0.25) + geom_point(aes(fill=DSM.group),pch=21,size=3,alpha=0.25) + 
+  geom_line(aes(group=subject_id),alpha=0.1) + theme_bw() + 
+  xlab("TSO") + ylab("WHO Sample Severity Score") + geom_smooth(se = T,aes(color=DSM.group),alpha=0.15,size=1.25) + 
+  scale_color_manual(name="DSM group",values=c("red","deepskyblue1")) + scale_fill_manual(name="DSM group",values=c("red","deepskyblue1"))
+
+# DSM v. WHO Scores
+dsm.who.association <- merge(patient.data,who.score.df[,c("sample_label","visit","WHO.ordinal.scale.at.time.of.sampling")],
+                                by=c("sample_label","visit"),all.x=T)
+ggplot(dsm.who.association,aes(as.factor(WHO.ordinal.scale.at.time.of.sampling),PC1)) + geom_boxplot(outlier.shape = NA) +
+  geom_jitter(alpha=0.75,size=2,pch=21,aes(fill=severity.outcome),width=0.1,height=0) + xlab("WHO Severity Score") + ylab("DSM") +
+  stat_compare_means() +
+  scale_fill_manual(name="Severity-Outcome",values=severity.color) + theme_bw() + ylim(-3,4.5)
+
+dsm.who.association$WHO.severity <- "Mild"
+dsm.who.association[dsm.who.association$WHO.ordinal.scale.at.time.of.sampling >= 5,"WHO.severity"] <- "Severe"
+ggplot(dsm.who.association,aes(as.factor(WHO.severity),PC1)) + geom_boxplot(outlier.shape = NA) +
+geom_jitter(alpha=0.75,size=2,pch=21,aes(fill=severity.outcome),width=0.1,height=0) + xlab("WHO Severity Class") + ylab("DSM") +
+    stat_compare_means() +
+  scale_fill_manual(name="Severity-Outcome",values=severity.color) + theme_bw() + ylim(-3,4.5)
+```
+
+### Session Info
+```{r save}
+patient.data <- patient.data[,-c(1:2,18:20)]
+colnames(patient.data) <- gsub("test","sample",colnames(patient.data))
+patient.data[is.na(patient.data$date_of_onset_of_symptom),"days_from_symptom_onset_to_sample"] <- NA
+patient.data <- patient.data[,grep("date",colnames(patient.data),invert = T)]
+saveRDS(patient.data,file.path(output.folder,"citeseq.patient.end.points.RDS"))
+
+sessionInfo()
+```

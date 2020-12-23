@@ -1,0 +1,912 @@
+<html>
+
+<head>
+<title>Time Resolved Multimodal Single Cell Analyses of COVID-19 Reveal Disease Severity Network and Late Immune Response Juncture</title>
+<meta charset="utf-8">
+      <link rel="icon" type="image/png" href="public/images/favicon.ico">
+
+      <!-- Latest compiled and minified CSS -->
+			<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+		  <!-- Custom styles for this template -->
+		    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.1/css/font-awesome.min.css">
+		    <link href="public/stylesheet/main.css" rel="stylesheet">
+
+      <!-- Custom javascript file -->
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+        <script src="public/js/main.js"></script>
+	<script src="public/js/github-api.js"></script>
+
+<style>
+<!--
+ /* Font Definitions */
+ @font-face
+	{font-family:"Cambria Math";
+	panose-1:2 4 5 3 5 4 6 3 2 4;
+	mso-font-charset:0;
+	mso-generic-font-family:roman;
+	mso-font-pitch:variable;
+	mso-font-signature:-536869121 1107305727 33554432 0 415 0;}
+@font-face
+	{font-family:Calibri;
+	panose-1:2 15 5 2 2 2 4 3 2 4;
+	mso-font-charset:0;
+	mso-generic-font-family:swiss;
+	mso-font-pitch:variable;
+	mso-font-signature:-536858881 -1073732485 9 0 511 0;}
+ /* Style Definitions */
+ p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{mso-style-unhide:no;
+	mso-style-qformat:yes;
+	mso-style-parent:"";
+	margin-top:0in;
+	margin-right:0in;
+	margin-bottom:8.0pt;
+	margin-left:0in;
+	line-height:105%;
+	mso-pagination:widow-orphan;
+	font-size:11.0pt;
+	font-family:"Calibri",sans-serif;
+	mso-ascii-font-family:Calibri;
+	mso-ascii-theme-font:minor-latin;
+	mso-fareast-font-family:Calibri;
+	mso-fareast-theme-font:minor-latin;
+	mso-hansi-font-family:Calibri;
+	mso-hansi-theme-font:minor-latin;
+	mso-bidi-font-family:"Times New Roman";
+	mso-bidi-theme-font:minor-bidi;}
+a:link, span.MsoHyperlink
+	{mso-style-noshow:yes;
+	mso-style-priority:99;
+	#color:#0563C1;
+	mso-themecolor:hyperlink;
+	#text-decoration:underline;
+	text-underline:single;}
+a:visited, span.MsoHyperlinkFollowed
+	{mso-style-noshow:yes;
+	mso-style-priority:99;
+	#color:#954F72;
+	mso-themecolor:followedhyperlink;
+	#text-decoration:underline;
+	text-underline:single;}
+p.MsoListParagraph, li.MsoListParagraph, div.MsoListParagraph
+	{mso-style-priority:34;
+	mso-style-unhide:no;
+	mso-style-qformat:yes;
+	margin-top:0in;
+	margin-right:0in;
+	margin-bottom:8.0pt;
+	margin-left:.5in;
+	mso-add-space:auto;
+	line-height:105%;
+	mso-pagination:widow-orphan;
+	font-size:11.0pt;
+	font-family:"Calibri",sans-serif;
+	mso-ascii-font-family:Calibri;
+	mso-ascii-theme-font:minor-latin;
+	mso-fareast-font-family:Calibri;
+	mso-fareast-theme-font:minor-latin;
+	mso-hansi-font-family:Calibri;
+	mso-hansi-theme-font:minor-latin;
+	mso-bidi-font-family:"Times New Roman";
+	mso-bidi-theme-font:minor-bidi;}
+p.MsoListParagraphCxSpFirst, li.MsoListParagraphCxSpFirst, div.MsoListParagraphCxSpFirst
+	{mso-style-priority:34;
+	mso-style-unhide:no;
+	mso-style-qformat:yes;
+	mso-style-type:export-only;
+	margin-top:0in;
+	margin-right:0in;
+	margin-bottom:0in;
+	margin-left:.5in;
+	margin-bottom:.0001pt;
+	mso-add-space:auto;
+	line-height:105%;
+	mso-pagination:widow-orphan;
+	font-size:11.0pt;
+	font-family:"Calibri",sans-serif;
+	mso-ascii-font-family:Calibri;
+	mso-ascii-theme-font:minor-latin;
+	mso-fareast-font-family:Calibri;
+	mso-fareast-theme-font:minor-latin;
+	mso-hansi-font-family:Calibri;
+	mso-hansi-theme-font:minor-latin;
+	mso-bidi-font-family:"Times New Roman";
+	mso-bidi-theme-font:minor-bidi;}
+p.MsoListParagraphCxSpMiddle, li.MsoListParagraphCxSpMiddle, div.MsoListParagraphCxSpMiddle
+	{mso-style-priority:34;
+	mso-style-unhide:no;
+	mso-style-qformat:yes;
+	mso-style-type:export-only;
+	margin-top:0in;
+	margin-right:0in;
+	margin-bottom:0in;
+	margin-left:.5in;
+	margin-bottom:.0001pt;
+	mso-add-space:auto;
+	line-height:105%;
+	mso-pagination:widow-orphan;
+	font-size:11.0pt;
+	font-family:"Calibri",sans-serif;
+	mso-ascii-font-family:Calibri;
+	mso-ascii-theme-font:minor-latin;
+	mso-fareast-font-family:Calibri;
+	mso-fareast-theme-font:minor-latin;
+	mso-hansi-font-family:Calibri;
+	mso-hansi-theme-font:minor-latin;
+	mso-bidi-font-family:"Times New Roman";
+	mso-bidi-theme-font:minor-bidi;}
+p.MsoListParagraphCxSpLast, li.MsoListParagraphCxSpLast, div.MsoListParagraphCxSpLast
+	{mso-style-priority:34;
+	mso-style-unhide:no;
+	mso-style-qformat:yes;
+	mso-style-type:export-only;
+	margin-top:0in;
+	margin-right:0in;
+	margin-bottom:8.0pt;
+	margin-left:.5in;
+	mso-add-space:auto;
+	line-height:105%;
+	mso-pagination:widow-orphan;
+	font-size:11.0pt;
+	font-family:"Calibri",sans-serif;
+	mso-ascii-font-family:Calibri;
+	mso-ascii-theme-font:minor-latin;
+	mso-fareast-font-family:Calibri;
+	mso-fareast-theme-font:minor-latin;
+	mso-hansi-font-family:Calibri;
+	mso-hansi-theme-font:minor-latin;
+	mso-bidi-font-family:"Times New Roman";
+	mso-bidi-theme-font:minor-bidi;}
+p.msonormal0, li.msonormal0, div.msonormal0
+	{mso-style-name:msonormal;
+	mso-style-unhide:no;
+	mso-margin-top-alt:auto;
+	margin-right:0in;
+	mso-margin-bottom-alt:auto;
+	margin-left:0in;
+	mso-pagination:widow-orphan;
+	font-size:12.0pt;
+	font-family:"Times New Roman",serif;
+	mso-fareast-font-family:"Times New Roman";
+	mso-fareast-theme-font:minor-fareast;}
+.MsoChpDefault
+	{mso-style-type:export-only;
+	mso-default-props:yes;
+	font-size:10.0pt;
+	mso-ansi-font-size:10.0pt;
+	mso-bidi-font-size:10.0pt;
+	font-family:"Calibri",sans-serif;
+	mso-ascii-font-family:Calibri;
+	mso-ascii-theme-font:minor-latin;
+	mso-fareast-font-family:Calibri;
+	mso-fareast-theme-font:minor-latin;
+	mso-hansi-font-family:Calibri;
+	mso-hansi-theme-font:minor-latin;
+	mso-bidi-font-family:"Times New Roman";
+	mso-bidi-theme-font:minor-bidi;}
+@page WordSection1
+	{size:8.5in 11.0in;
+	margin:1.0in 1.0in 1.0in 1.0in;
+	mso-header-margin:.5in;
+	mso-footer-margin:.5in;
+	mso-paper-source:0;}
+div.WordSection1
+	{page:WordSection1;}
+-->
+</style>
+<!--[if gte mso 10]>
+<style>
+ /* Style Definitions */
+ table.MsoNormalTable
+	{mso-style-name:"Table Normal";
+	mso-tstyle-rowband-size:0;
+	mso-tstyle-colband-size:0;
+	mso-style-noshow:yes;
+	mso-style-priority:99;
+	mso-style-parent:"";
+	mso-padding-alt:0in 5.4pt 0in 5.4pt;
+	mso-para-margin:0in;
+	mso-para-margin-bottom:.0001pt;
+	mso-pagination:widow-orphan;
+	font-size:10.0pt;
+	font-family:"Calibri",sans-serif;
+	mso-ascii-font-family:Calibri;
+	mso-ascii-theme-font:minor-latin;
+	mso-hansi-font-family:Calibri;
+	mso-hansi-theme-font:minor-latin;
+	mso-bidi-font-family:"Times New Roman";
+	mso-bidi-theme-font:minor-bidi;}
+table.MsoTableGrid
+	{mso-style-name:"Table Grid";
+	mso-tstyle-rowband-size:0;
+	mso-tstyle-colband-size:0;
+	mso-style-priority:39;
+	mso-style-unhide:no;
+	border:solid windowtext 1.0pt;
+	mso-border-alt:solid windowtext .5pt;
+	mso-padding-alt:0in 5.4pt 0in 5.4pt;
+	mso-border-insideh:.5pt solid windowtext;
+	mso-border-insidev:.5pt solid windowtext;
+	mso-para-margin:0in;
+	mso-para-margin-bottom:.0001pt;
+	mso-pagination:widow-orphan;
+	font-size:11.0pt;
+	font-family:"Calibri",sans-serif;
+	mso-ascii-font-family:Calibri;
+	mso-ascii-theme-font:minor-latin;
+	mso-hansi-font-family:Calibri;
+	mso-hansi-theme-font:minor-latin;
+	mso-bidi-font-family:"Times New Roman";
+	mso-bidi-theme-font:minor-bidi;}
+</style>
+<![endif]--><!--[if gte mso 9]><xml>
+ <u1:shapedefaults u2:ext="edit" spidmax="1026"/>
+</xml><![endif]--><!--[if gte mso 9]><xml>
+ <u3:shapelayout u4:ext="edit">
+  <u3:idmap u4:ext="edit" data="1"/>
+ </u3:shapelayout>
+</xml><![endif]--><!--[if gte mso 9]><xml>
+ <o:shapedefaults v:ext="edit" spidmax="1026"/>
+</xml><![endif]--><!--[if gte mso 9]><xml>
+ <o:shapelayout v:ext="edit">
+  <o:idmap v:ext="edit" data="1"/>
+ </o:shapelayout></xml><![endif]-->
+</head>
+
+<body lang=EN-US link="#0563C1" vlink="#954F72" style='tab-interval:.5in'>
+
+  <!-- HEADER  -->
+        <nav class="navbar navbar-default">
+          <div class="container-fluid">
+          <div class="nephele-topbar">
+            <!-- <div class="pull-right">
+             <button type="button" class="btn btn-link"><p style="color:white">Help</p></button>
+            </div> -->
+            <div class="site-topbar container-fluid">
+
+                 <a class=" btn btn-link hidden-sm hidden-xs" href="https://www.hhs.gov" target="_blank"><p style="color:white">U.S. Department of Health & Human Services</p></a>
+
+                 <button type="button" class="btn btn-link hidden-lg hidden-md"><a href="https://www.hhs.gov" target="_blank"><img class="" src="public/images/white-logo-header/hhs-logo-topbar.png" width="24.947" height="25" alt="logo"></a></button>
+
+                 <a class=" btn btn-link hidden-sm hidden-xs" href="https://www.nih.gov" target="_blank"><p style="color:white">National Institutes of Health</p></a>
+
+                 <button type="button" class="btn btn-link hidden-lg hidden-md"><a href="https://www.nih.gov" target="_blank"><img class="" src="public/images/white-logo-header/nih-logo-topbar.png" width="33.947" height="25" alt="logo"></a></button>
+
+                 <a class="btn btn-link hidden-sm hidden-xs" href="https://www.niaid.nih.gov" target="_blank"><p style="color:white">National Institute of Allergy &amp; Infectious Diseases</p></a>
+
+                 <button type="button" class="btn btn-link hidden-lg hidden-md"><a href="https://www.niaid.nih.gov" target="_blank"><img class="" src="public/images/white-logo-header/white_trans_back.png" width="24.947" height="25" alt="logo"></a></button>
+
+ 		<a class="btn btn-link hidden-sm hidden-xs" href="https://www.niaid.nih.gov/research/lab-immune-system-biology" target="_blank"><p style="color:white">Laboratory of Immune System Biology</p></a>
+
+                 <button type="button" class="btn btn-link hidden-lg hidden-md"><a href="https://www.niaid.nih.gov/research/lab-immune-system-biology" target="_blank"><img class="" src="public/images/white-logo-header/white_trans_back.png" width="24.947" height="25" alt="logo"></a></button>
+
+		<a class="btn btn-link hidden-sm hidden-xs" href="https://www.niaid.nih.gov/research/john-tsang-phd" target="_blank"><p style="color:white">Multiscale Systems Biology Section</p></a>
+
+                 <button type="button" class="btn btn-link hidden-lg hidden-md"><a href="https://www.niaid.nih.gov/research/john-tsang-phd" target="_blank"><img class="" src="public/images/white-logo-header/white_trans_back.png" width="24.947" height="25" alt="logo"></a></button>
+
+            </div>
+          </div>
+          </div>
+         
+        </nav>
+        <!-- / END OF THE HEADER  -->
+
+
+    <div class="container">
+
+    <button onclick="topFunction()" id="myBtn" class="topBtn fa fa-chevron-up" title="Go to top" aria-label="Move to the top"></button>
+
+<table width="90%"><tr><td>
+
+<div class=WordSection1>
+
+<table class=MsoNormalTable border=0 cellpadding=0
+ style='mso-cellspacing:1.5pt;mso-yfti-tbllook:1184'>
+ <tr style='mso-yfti-irow:0;mso-yfti-firstrow:yes;mso-yfti-lastrow:yes'>
+  <td style='padding:20px'>
+  <p class=MsoNormal><b><span style='font-size:16.0pt;line-height:105%;
+  color:#2F5597;mso-themecolor:accent1;mso-themeshade:191;mso-style-textfill-fill-color:
+  #2F5597;mso-style-textfill-fill-themecolor:accent1;mso-style-textfill-fill-alpha:
+  100.0%;mso-style-textfill-fill-colortransforms:lumm=75000'>Time Resolved
+  Multimodal Single Cell Analyses of COVID-19 Reveal Disease Severity Network
+  and Late Immune Response Juncture<u5:p></u5:p></span></b><o:p></o:p></p>
+  
+  <table class=MsoTableGrid border=0 cellspacing=0 cellpadding=0 width="90%"
+   style='width:90.0%;border-collapse:collapse;border:none;mso-yfti-tbllook:
+   1184;mso-padding-alt:0in 5.4pt 0in 5.4pt;mso-border-insideh:none;mso-border-insidev:
+   none'>
+   <tr style='mso-yfti-irow:0;mso-yfti-firstrow:yes;mso-yfti-lastrow:yes'>
+   <td style='padding-bottom:10px'>
+<p class=MsoNormal><u5:p>&nbsp;</u5:p></p>
+  <p class=MsoNormal><span style='font-size:14pt;line-height:105%'>Use the links below to go to the markdown reports for the
+  corresponding figure panels. Source code of the markdown files can be found
+  in this github repository: <a
+  href="https://github.com/niaid/covid19-time-resolved">https://github.com/niaid/covid19-time-resolved</a></span></p>
+   </td></tr>
+   <tr style='mso-yfti-irow:0;mso-yfti-firstrow:yes;mso-yfti-lastrow:yes'>
+    <td width="70%" valign=top style='width:70.0%;padding:0in 5.4pt 0in 5.4pt'>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><span style='font-size:14.0pt'>Figure 1: Study
+    Design and a Multi-parameter Disease Severity Metric (DSM)<u5:p></u5:p></span></b></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/overview/patient.and.sample.overview.html">A</a>) COVID-19 patient
+    cohort overview and sample collection timeline. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(B)
+    Experimental design, analysis questions, and approach. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/dsm/citeseq.patient.dsm.html">C</a>) Heatmap of 18 clinical and
+    serum protein measurements of patients after correction for days since
+    hospital admission. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/dsm/citeseq.patient.dsm.html">D</a>) Parameter importance of the
+    fitted coefficient values from partial-least-square (PLS) ordinal
+    regression models of disease severity. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/dsm/brescia.dsm.validation.html">E</a>) Distribution of patient
+    disease severity metric (DSM) grouped based on the disease severity-outcome
+    classification for the 30 patients with CITE-seq data (left panel) and an
+    independent set of 64 patients from Brescia (right panel).<o:p></o:p></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'><u5:p>&nbsp;</u5:p><o:p></o:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><u5:p>&nbsp;</u5:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><span style='font-size:14.0pt'>Figure 2: A
+    Multimodal Single Immune Cell Atlas of COVID-19 <u5:p></u5:p></span></b></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(A) Average
+    protein expression in each coarse-level cell cluster.</p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(B) UMAP
+    visualization of single cells based on protein expression profiles for
+    innate and adaptive groupings of cells labelled by the name of the
+    corresponding coarse-level cluster.</p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(C) Average
+    expression of selected surface protein markers in example finer-resolution
+    CD4+ T cell clusters (CM = central memory, TM = transitional memory, EM.TE
+    = terminal/effector memory).</p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(D-I)
+    Transcript-based UMAP visualization of classical monocytes defined by
+    surface proteins. <o:p></o:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><u5:p>&nbsp;</u5:p><o:p></o:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><u5:p>&nbsp;</u5:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><span style='font-size:14.0pt'>Figure 3:
+    Cell-type-specific Gene Expression Signatures of COVID-19 Disease Status
+    and Severity<u5:p></u5:p></span></b></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(A) Gene set
+    enrichment analysis (GSEA) result of COVID-19 versus HCs at T0. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(B) Similar
+    to (A) but the enrichment analysis was performed based on association with
+    DSM, and the model controlled for TSO. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/DEplot.subject.hm.html">C</a>) Heatmap
+    of type I IFN response in classical monocytes. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/modulescore.TSO.html">D</a>)
+    Per-sample gene set signature scores of the GO Response to type I IFN gene
+    set vs. TSO (in days) in DSM-low and DSM-high groups. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/NES.PC1groupTSO.interaction.html">E</a>) Scatter
+    plot comparing the effect size (normalized enrichment score) of association
+    between TSO and the GO Response to type I IFN gene set in the DSM-high (y
+    axis) and DSM-low (x axis) patients. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/DEplot.subject.hm.html">F</a>) Heatmap
+    of apoptosis/cell death signature in pDCs. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(G) Heatmap
+    showing the sample-level pairwise Pearson correlations among serum
+    IFN-&#945;2a level, pDC frequency, the apoptosis signature score in pDCs,
+    as well as the IFN-I and protein translation signature scores in classical
+    monocyte, CD56dimCD16hi NK, and CD8 memory T cell clusters (* p value &lt;
+    0.05). <o:p></o:p></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'><u5:p>&nbsp;</u5:p><o:p></o:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><u5:p>&nbsp;</u5:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><span style='font-size:14.0pt'>Figure 4: Conditional
+    Independence Network Analysis Points to IL-15-associated Fatty Acid
+    Metabolism and Attenuated Inflammation in CD56dimCD16hi NK Cells as Primary
+    Correlates of Disease Severity<u5:p></u5:p></span></b></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/severity.network/severity.network.html">A</a>) Disease severity
+    network showing cell type-specific gene set signatures directly connected
+    with DSM.</p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/modulescore.corr.html">B</a> and <a
+    href="./A1/modulescore.corr.html">C</a>, <a
+    href="./A1/modulescore.corr.html">G</a>
+    and <a
+    href="./A1/modulescore.corr.html">I</a>) Scatter plots showing the correlation of circulating IL-15 level
+    versus REACTOME_Fatty acid metabolism signature score (B) and DSM (C);
+    REACTOME_Fatty acid metabolism score versus HALLMARK_TNFa signaling via
+    NF-kB score and GO_Cellular response to IL-1 score (G); REACTOME_Fatty acid
+    metabolism score versus HALLMARK_mTORC1 signaling score and normalized IFNG
+    mRNA expression (I). </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/DEplot.subject.hm.html">D</a>) Heatmap
+    of REACTOME_Fatty acid metabolism LE genes from the GSEA analysis of DSM
+    association in CD56dimCD16hiNK cells (see Figure 3B). </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/DEplot.subject.hm.html">E</a> and <a
+    href="./A1/DEplot.subject.hm.html">F</a>)
+    Similar to (D). Heatmaps of inflammation related gene sets in CD56dimCD16hi
+    NK cells: HALLMARK_TNFa signaling via NF-kB (E), GO_Cellular response to
+    IL1 (see (A)), and KEGG_Chemokine signaling pathway (see (A)) (F). </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/DEplot.subject.hm.html">H</a>) Average
+    IFNG mRNA expression of CD56dimCD16hi NK cells; (B-C, F, I) are aligned
+    column wise.</p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/modulescore.TSO.html">J</a> and <a
+    href="./A1/modulescore.TSO.html">K</a>)
+    Per-sample gene set signature scores of REACTOME_Fatty acid metabolism (J),
+    HALLMARK_TNFa signaling via NFkB and GO_Cellular response to IL-1 (K) vs.
+    TSO (in days) in DSM-high (red) and DSM-low (blue) groups of CD56dimCD16hi
+    NK cells. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/modulescore.corr.html">L</a>)
+    Circulating IL-15 levels in DSM-low and DSM-high groups vs. TSO.<o:p></o:p></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'><u5:p>&nbsp;</u5:p><o:p></o:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><u5:p>&nbsp;</u5:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><span style='font-size:14.0pt'>Figure 5: Single Cell
+    and Clonal Expansion Analysis in CD8+ T cells and Exhaustion Assessment in
+    Clonal CD8+ T cells<u5:p></u5:p></span></b></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(A) Heatmap
+    showing the gene expression profile of CD8+ T cell clusters identified
+    based on single-cell mRNA expression of the leading-edge genes of selected
+    pathways presented in Figure 3; only COVID-19 T0 samples are shown. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(B) Average
+    expression of selected surface proteins in the clusters from (A). </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(C) Results
+    of linear model accounting for age, and experimental batch, comparing the
+    frequency of CD8+ T cell clusters from (A) between COVID-19 and HC samples.
+    </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(D) Fraction
+    of overlap between RNA based clustering (from A) and surface protein based
+    CD8+ naive and memory T cell cluster annotations (based on high resolution
+    clustering). </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(E) CD8+ T
+    cell clonality in HC, DSM-low, DSM-high groups. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(F)
+    Coefficients from linear models of mean surface protein expression of
+    canonical exhaustion markers fitted to COVID-19 patients and HCs. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(G) GSEA
+    results for assessing enrichment for known exhaustion signatures in DE
+    genes for expanded CD8+ T cells in COVID-19 versus HCs and DSM-high versus DSM-low
+    comparisons. <o:p></o:p></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'><u5:p>&nbsp;</u5:p><o:p></o:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><u5:p>&nbsp;</u5:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><span style='font-size:14.0pt'>Figure 6: Analyses of
+    Timing Effects Suggest a Late Immune Response Juncture<u5:p></u5:p></span></b></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/cell.freq.plot.html">A</a>) Time
+    course of monocyte subset frequencies in DSM-low and DSM-high groups. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/critical.juncture/dsm.high.v.low.cytokine.html">B</a>) Similar to
+    (A) but showing the absolute blood neutrophil and monocyte counts. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/NES.PC1onsetgroup.interaction.html">C</a>) Effect
+    size (normalized enrichment score from GSEA) comparison of the period
+    before day 17 (TSO &lt; day 17, green) and during the TSO = days 17-23
+    period (purple) for inflammatory related gene sets. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(D) Similar
+    to Figure 3A, but here showing GSEA results for assessing differences
+    between the DSM-high versus DSM-low groups using only samples from days 17-23
+    since symptom onset.</p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/modulescore.TSO.html">E</a>) Time
+    course of gene set signature scores of inflammatory related gene sets in
+    DSM-low and DSM-high patient groups in CD56dimCD16hi NK cells and classical
+    monocytes. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/critical.juncture/dsm.high.v.low.cytokine.html">F</a>) Time course
+    of serum protein levels from DSM-high and DSM-low patients respectively. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(G)
+    Hypothesis and approach for assessing and validating the late immune
+    response juncture hypothesis by using serum protein profiles of critical
+    ill patients with either recovery or deceased outcomes.</p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/critical.juncture/deceased.v.recovered.cytokine.html">H</a>)
+    Effect size plots of circulating serum proteins comparing the difference
+    between critical deceased vs. recovered patients before (days 7-16), during
+    (days 17-23), and after (days 24-30) the juncture period. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/critical.juncture/deceased.v.recovered.cytokine.html">I</a>)
+    Similar to (F) but showing serum protein levels of critical ill patients
+    with recovery or deceased outcomes (see (G)). <o:p></o:p></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'><u5:p>&nbsp;</u5:p><o:p></o:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><u5:p>&nbsp;</u5:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><span style='font-size:14.0pt'>Supplemental Figure 1
+    (related to Figure 1): Timeline of Treatments Relative to Hospital
+    Admission Date and DSM Validation in an Independent Set of Patients<u5:p></u5:p></span></b></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/overview/patient.and.sample.overview.html">A</a>) Timeline
+    of treatments relative to hospital admission date. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/dsm/citeseq.patient.dsm.html">B</a>)
+    Distribution of patient disease severity metric (DSM) grouped based on the
+    WHO ordinal disease severity score of the CITE-seq cohort at the earliest
+    time of PBMC sampling. <o:p></o:p></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'><u5:p>&nbsp;</u5:p><o:p></o:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><u5:p>&nbsp;</u5:p></b></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><span style='font-size:14.0pt'>Supplemental Figure 2
+    (related to Figure 2): Single Immune Cell Atlas of COVID-19 Reveals Cell
+    Populations Associated with COVID-19 Disease Status and Severity<u5:p></u5:p></span></b></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/cell.freq.corr.html">A</a>)
+    Correlations of cell frequencies gated from CITE-seq and independently
+    obtained 27-color flow cytometry data of the same samples. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/cell.freq.plot.html">B</a>)
+    Frequencies of immune cell clusters/subsets in HC, DSM-low (less severe
+    disease; DSM at or below median of DSM) and DSM-high (more severe disease;
+    DSM above median) groups at T0 (near hospitalization). </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/cell.freq.plot.html">C</a>) Heatmap
+    showing cell frequencies of major cell clusters/subsets in individual
+    subjects (columns), grouped by HC and DSM. <o:p></o:p></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'><u5:p>&nbsp;</u5:p><o:p></o:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><u5:p>&nbsp;</u5:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><span style='font-size:14.0pt'>Supplemental Figure 3
+    (related to Figure 3): Cell-type-specific Gene Expression Signatures
+    Association with Time Since Symptom Onset and Disease Severity<u5:p></u5:p></span></b></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(A and B)
+    Similar to Figure 3B, but showing GSEA results (of select gene sets) based
+    on association with time since symptom onset (TSO) in DSM-low (A) and
+    DSM-high (B). </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/DEplot.subject.hm.html">C</a>) Similar
+    to Figure 3C. Heatmap of translation/ribosomal gene signature in classical
+    monocytes.</p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/modulescore.TSO.html">D</a>) Similar
+    to Figure 3D. Time course of gene set signature scores of
+    REACTOME_Translation and KEGG_Ribosome gene sets in DSM-low and DSM-high
+    groups, respectively. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/Schulte-Schrepping/cohort1.DEsubject.hm.html">E</a> and <a
+    href="./A1/Schulte-Schrepping/cohort2.DEsubject.hm.html">F</a>)
+    Similar to Figure 3F. Heatmap of apoptosis/cell death gene signature in
+    pDCs of validation cohorts - <i>Schulte-Schrepping et al., Cell, 2020</i> cohort
+    1 (E) and cohort 2 (F). </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(G) GSEA
+    results of <i>Schulte-Schrepping et al.</i> cohorts for pDC apoptosis/cell
+    death signature identified in Brescia cohort. <o:p></o:p></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'><u5:p>&nbsp;</u5:p><o:p></o:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><u5:p>&nbsp;</u5:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><span style='font-size:14.0pt'>Supplemental Figure 4
+    (related to Figure 4): Supporting Data for Dissecting Primary Gene
+    Expression Signature Correlates Inferred by Conditional Independence
+    Network Analysis <u5:p></u5:p></span></b></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/cytokine.geneset.correlation/citeseq.T0.cytokine.pathway.corr.html">A</a>) Scatter
+    plot of REACTOME_Oxidative stress-induced senescence signature score and
+    GO_Apoptotic signaling signature score in pDCs.</p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/cytokine.geneset.correlation/citeseq.T0.cytokine.pathway.corr.html">B</a>) Similar
+    to (A), but between circulating IL-15 level and fatty acid metabolism
+    signature score in CD56dimCD16hi NK cells after regressing out their
+    associations with DSM.</p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/Schulte-Schrepping/cohort1.DEsubject.hm.html">C</a> and <a
+    href="./A1/Schulte-Schrepping/cohort2.DEsubject.hm.html">D</a>)
+    Similar to Figure 4D. Heatmaps of REACTOME_Fatty acid metabolism in NK
+    cells of two validation cohorts - <i>Schulte-Schrepping et al, Cell 2020</i>
+    cohort 1 (C) and cohort 2 (D). </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(E) GSEA
+    results of <i>Schulte-Schrepping et al.</i> cohorts for NK cell
+    REACTOME_Fatty acid metabolism.</p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/Schulte-Schrepping/NK.modulescore.corr.html">F</a>) Similar
+    to Figure 4G. Scatter plot of REACTOME_Fatty acid metabolism score and
+    HALLMAKR_TNFa signaling via NF-kB score in the validation cohorts - <i>Schulte-Schrepping
+    et al, 2020, Cell.</i></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/DEplot.subject.hm.html">G</a> and <a
+    href="./A1/DEplot.subject.hm.html">H</a>)
+    Similar to Figure 4E. Heatmaps of inflammation related gene sets in
+    classical monocytes: HALLMARK_TNFa signaling via NF-kB (G) and
+    HALLMARK_Inflammatory response (H).<o:p></o:p></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'><u5:p>&nbsp;</u5:p><o:p></o:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><u5:p>&nbsp;</u5:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><span style='font-size:14.0pt'>Supplemental Figure 5
+    (related to Figure 4): Exogeneous Corticosteroid Treatment is Not a Major
+    Driver of Cell-type-specific Gene Expression Signatures Associated with
+    Disease Severity<u5:p></u5:p></span></b></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(A) GSEA
+    results for glucocorticoid response signature in DSM association model. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/cytokine.geneset.correlation/citeseq.T0.cytokine.pathway.corr.html">B</a> and <a
+    href="./A3/cytokine.geneset.correlation/citeseq.T0.cytokine.pathway.corr.html">C</a>)
+    Scatter plot showing the correlations between the indicated signature
+    scores (computed using GSVA) and the glucocorticoid response signature
+    score (B) or the TSC22D3 mRNA expression level (C) in CD56dimCD16hi NK
+    cells. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A1/steroiduse.TSC22D3.html">D</a>) TSC22D3
+    mRNA expression levels of CD56dimCD16hi NK cells and classical monocytes in
+    HC, no steroid-use and steroid-use COVID-19 patient groups. <o:p></o:p></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'><u5:p>&nbsp;</u5:p><o:p></o:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><u5:p>&nbsp;</u5:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><span style='font-size:14.0pt'>Supplemental Figure 6
+    (related to Figure 5): Single Cell and Clonal Expansion Analysis in CD4+ T
+    cells and Exhaustion Assessment in CD8+ T cells<u5:p></u5:p></span></b></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(A-D) Same as
+    Figures 5A-5D but for CD4+ T cells. 15 CD4+ T cell clusters were tested in
+    linear models.</p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(E) Similar
+    to Figure 5F but for pseudo-bulk mRNA expression of canonical exhaustion
+    markers. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(F)
+    Association of proportion of CD39+PD1+ cells with COVID-19 versus HCs and
+    DSM in clonal CD8+ memory T cells using different cutoffs for CD39 and PD1
+    surface protein expression DSB counts (0.5, 1).</p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(G) Association
+    of proportion of exhausted cells with COVID-19 versus HCs and DSM in clonal
+    CD8+ memory T cells based using different cutoffs for surface protein
+    expression DSB counts (0.5, 1, 1.5) and number of exhaustion markers above
+    DSB count cutoff (2 or 3 markers). </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(H) Gene set
+    enrichment of <i>Wherry et al.</i> up and down genes in KEGG, GO BP,
+    REACTOME, and Li BTM's. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(I) GSEA
+    result of <i>Schulte-Schrepping et al.</i> cohorts for exhaustion
+    signatures of COVID-19 versus HCs and severe versus mild comparisons at T0.
+    </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(J) Similar
+    to Figure 5G. GSEA results of <i>Schulte-Schrepping et al.</i> cohorts for <i>Wherry
+    et al.</i> exhaustion signatures of COVID-19 versus HCs and severe versus
+    mild comparisons at T0. <o:p></o:p></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'><u5:p>&nbsp;</u5:p><o:p></o:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><u5:p>&nbsp;</u5:p></p>
+    <p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;
+    line-height:normal'><b><span style='font-size:14.0pt'>Supplemental Figure 7
+    (related to Figure 6): Supporting Data for Critical Juncture Analysis<u5:p></u5:p></span></b></p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(A) Similar
+    to Figure 3A, but here showing GSEA results for assessing the differences
+    of delta between disease severity groups (DSM-high versus DSM-low) between
+    the days 17-23 time window and the period before (TSO &lt; day 17). </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/critical.juncture/deceased.v.recovered.cytokine.html">B</a>) Time
+    course of blood neutrophil and monocyte counts in recovered and deceased
+    groups. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/critical.juncture/deceased.v.recovered.cytokine.html">C</a>) Effect
+    size comparison of DSM-high versus DSM-low (CITE-seq cohort) and deceased
+    versus recovered (critical patients with distinct outcome subcohorts - see
+    Figure 6G) at the days 17-23 period. </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/critical.juncture/cytokine.critical.juncture.validation.html">D</a>) Similar
+    to (C). Effect size comparison of Brescia deceased versus recovered and an
+    independent US cohort (Yale cohort, <i>Lucas et al, 2020, Nature</i>)
+    deceased versus recovered patients (See Methods) for 38 overlapping
+    circulating proteins/cytokines at the juncture period (TSO days 17-23). </p>
+    <p class=MsoNormal style='margin-top:6.0pt;margin-right:0in;margin-bottom:
+    0in;margin-left:0in;margin-bottom:.0001pt;line-height:normal'>(<a
+    href="./A3/critical.juncture/deceased.v.recovered.cytokine.html">E</a>) Similar
+    to Figure 6I but for antibody measurements against SARS CoV-2 spike and
+    nucleocapsid proteins in critically ill patients with recovered or deceased
+    outcomes. </p>
+    </td>
+   </tr>
+  </table>
+  <p class=MsoNormal><b><u5:p>&nbsp;</u5:p></b><o:p></o:p></p>
+  <p class=MsoNormal><b><u5:p>&nbsp;</u5:p></b></p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoNormal style='margin-bottom:0in;margin-bottom:.0001pt;line-height:
+normal'><span style='font-size:12.0pt;font-family:"Times New Roman",serif'><o:p>&nbsp;</o:p></span></p>
+
+</div>
+
+</td></tr></table>
+
+</div><!-- /container space-header -->
+
+      <div>
+      	 <!-- Site footer -->
+    <footer class="main-niaid-footer">
+        <div class="container alignment-center-footer">
+        <!-- Three columns  -->
+      <div class="row">
+        <div class="col-sm-4 col-md-4 col-lg-4">
+
+          <h6 class="footer-links-heading " >connect with niaid</h6>
+
+          <!-- Column One Media lINKS -->
+          <ul class="list-inline footer-links">
+            <li><a class="footer-links" href="https://www.facebook.com/niaid.nih" target="_blank" aria-label="facebook"><i class="fa fa-facebook fa-lg"></i></a></li>
+            <li><a class="footer-links" href="https://twitter.com/NIAIDNews" target="_blank" aria-label="twitter"><i class="fa fa-twitter fa-lg"></i></a></li>
+            <li><a class="footer-links" href="https://www.instagram.com/niaid/" target="_blank" aria-label="instagram"><i class="fa fa-instagram fa-lg"></i></a></li>
+            <li><a class="footer-links" href=" https://plus.google.com/+niaid" target="_blank" aria-label="google plus"><i class="fa fa-google-plus fa-lg"></i></a></li>
+            <li><a class="footer-links" href="https://www.flickr.com/photos/niaid/" target="_blank" aria-label="flickr"><i class="fa fa-flickr fa-lg"></i></a></li>
+            <li><a class="footer-links" href="https://www.youtube.com/user/niaid" target="_blank" aria-label="youtube"><i class="fa fa-youtube-play fa-lg"></i></a></li>
+            <li><a class="footer-links" href="https://www.linkedin.com/company/2360731" target="_blank" aria-label="linkedin"><i class="fa fa-linkedin fa-lg"></i></a></li>
+            <li><a class="footer-links" href="https://www.pinterest.com/niaid/" target="_blank" aria-label="pinterest"><i class="fa fa-pinterest-p fa-lg"></i></a></li>
+            <li><a class="footer-links" href="https://www.niaid.nih.gov/global/email-updates" target="_blank" aria-label="envelope"><i class="fa fa-envelope-o fa-lg"></i></a></li>
+          </ul><!-- Column One Media lINKS -->
+
+        </div><!-- /.col-sm-4 col-md-4 col-lg-4-->
+
+        <hr class="footer-columns-separator visible-xs ">
+
+        <div class="col-sm-4 col-md-4 col-lg-4">
+        <h6 class="footer-links-heading " >niaid links</h6>
+
+          <ul class="list-unstyled footer-links">
+
+            <li><a class="footer-links" href="https://www.niaid.nih.gov" target="_blank">NIAID Website</a></li>
+
+            <li><a class="footer-links" href="https://www.niaid.nih.gov/global/contact-us" target="_blank">Contact NIAID</a></li>
+
+            <li><a class="footer-links" href="https://www.niaid.nih.gov/global/website-help" target="_blank">Help</a></li>
+
+            <li><a class="footer-links" href="https://www.niaid.nih.gov/global/web-accessibility" target="_blank">Accessibility</a></li>
+
+            <li><a class="footer-links" href="https://www.niaid.nih.gov/privacy" target="_blank">Privacy Policy</a></li>
+
+            <li><a class="footer-links" href="https://www.niaid.nih.gov/global/website-disclaimer" target="_blank">Disclaimer</a></li>
+
+            <li><a class="footer-links" href="https://www.niaid.nih.gov/global/website-policies-and-notices" target="_blank">Website Links &amp; Policies</a></li>
+
+            <li><a class="footer-links" href="https://www.niaid.nih.gov/global/freedom-information-act" target="_blank">FOIA</a></li>
+
+          </ul>
+        </div><!-- /.col-sm-4 col-md-4 col-lg-4 -->
+
+        <hr class="footer-columns-separator visible-xs  ">
+
+
+        <div class="col-sm-4 col-md-4 col-lg-4">
+          <h6 class="footer-links-heading">related government sites</h6>
+
+          <ul class="list-unstyled footer-links">
+            <li><a class="footer-links" href="http://www.nih.gov" target="_blank">National Institutes of Health</a></li>
+            <li><a class="footer-links" href="http://www.hhs.gov" target="_blank">U.S. Department of Health &amp; Human Services</a></li>
+            <li><a class="footer-links" href="https://www.usa.gov" target="_blank">USA.gov</a></li>
+          </ul>
+        </div><!-- /.col-sm-4 col-md-4 col-lg-4 -->
+      </div><!-- /.row -->
+
+      <hr class="footer-hr">
+
+
+      <div class="row">
+        <div class="col-sm-4 col-md-4 col-lg-4">
+          <p class="footer-nih-tagline">National Institutes of Health. . .<br>Turning Discovery Into Health<sup>&reg;</sup></p>
+        </div><!-- /.col-sm-4 col-md-4 col-lg-4 -->
+
+        <hr class="footer-columns-separator visible-xs ">
+
+        <div class="col-sm-4 col-md-4 col-lg-4">
+          <address class="footer-address">
+        National Institutes of Health (NIH), 9000 Rockville Pike,<br>
+        Bethesda, Maryland 20892
+      </address>
+        </div><!-- /.col-sm-4 col-md-4 col-lg-4 -->
+
+        <hr class="footer-columns-separator visible-xs ">
+
+        <div class="col-sm-4 col-md-4 col-lg-4">
+          <ul class="list-inline">
+            <li><a class="" href="https://www.usa.gov" target="_blank"><img class="img-responsive" src="public/images/white-logo-footer/usagov-logo-footer.png" width="100" height="30.4" alt="USA.gov"><!-- <img class="img-responsive img-usa-footer"  alt="USA logo"> --></a></li>
+
+            <li><a class="" href="http://www.hhs.gov" target="_blank"><img class="img-responsive" src="public/images/white-logo-footer/hhs-logo-footer.png" width="30" height="36" alt="HHS.gov"><!-- <img class="img-responsive img-hhs-footer"  alt="HHS logo"> --></a></li>
+
+            <li><a class="" href="http://www.nih.gov" target="_blank"><img class="img-responsive" src="public/images/white-logo-footer/nih-logo-footer.png" width="48" height="30" alt="NIH.gov"><!-- <img class="img-responsive img-nih-footer" alt="NIH logo"> --></a></li>
+          </ul>
+        </div><!-- /.col-sm-4 col-md-4 col-lg-4 -->
+       </div>
+       </div>
+      </footer>
+      </div>
+
+<!-- <script language="JavaScript">
+var username = "john.tsang";
+var hostname = "niaid.nih.gov";
+var linktext = username + "@" + hostname ;
+document.getElementById('demo').innerHTML = ("<a href='" + "mail" + "to:" + username + "@" + hostname + "'>" + linktext + "</a>");
+</script> -->
+
+</body>
+
+</html>

@@ -1,0 +1,55 @@
+subject_id,age,sex,severity,outcome,sample_label,visit,days_between_sample_drawn_and_symptom_onset,steroid.use,o2.supplement,collected.in.icu,steroid.use2
+HGR0000042,53,M,Critical,Alive,BS-EQ-0015,T0,12,,,FALSE,FALSE
+HGR0000042,53,M,Critical,Alive,BS-EQ-0015,T1,18,,,FALSE,FALSE
+HGR0000051,55,M,Critical,Alive,BS-EQ-0014,T1,14,Dexamethasone,Tracheostomy*,FALSE,TRUE
+HGR0000051,55,M,Critical,Alive,BS-EQ-0014,T0,10,Dexamethasone,Tracheostomy*,FALSE,TRUE
+HGR0000051,55,M,Critical,Alive,BS-EQ-0014,T2,17,Dexamethasone,Tracheostomy*,FALSE,TRUE
+HGR0000051,55,M,Critical,Alive,BS-EQ-0014,T3,20,,Tracheostomy*,FALSE,FALSE
+HGR0000069,54,M,Critical,Alive,BS-EQ-0001,T0,13,Dexamethasone,Reservoir Mask*,FALSE,TRUE
+HGR0000069,54,M,Critical,Alive,BS-EQ-0001,T1,20,Dexamethasone,Reservoir Mask*,FALSE,TRUE
+HGR0000069,54,M,Critical,Alive,BS-EQ-0001,T2,33,,,FALSE,FALSE
+HGR0000071,71,F,Critical,Deceased,BS-EQ-0005,T0,8,Dexamethasone,Mechanical Ventilation*,FALSE,TRUE
+HGR0000074,52,M,Critical,Alive,BS-EQ-0026,T0,18,Dexamethasone,,FALSE,TRUE
+HGR0000078,40,F,Critical,Alive,BS-EQ-0003,T1,23,Dexamethasone*,,FALSE,TRUE
+HGR0000078,40,F,Critical,Alive,BS-EQ-0003,T0,18,Dexamethasone*,Tracheostomy*,FALSE,TRUE
+HGR0000079,37,M,Critical,Alive,BS-EQ-0006,T0,30,Steroids*,,FALSE,TRUE
+HGR0000079,37,M,Critical,Alive,BS-EQ-0006,T1,36,Steroids*,Mechanical Ventilation*,FALSE,TRUE
+HGR0000083,55,M,Moderate,Alive,BS-EQ-0002,T0,6,Steroids*,CPAP*,FALSE,TRUE
+HGR0000083,55,M,Moderate,Alive,BS-EQ-0002,T1,13,Steroids*,CPAP*,FALSE,TRUE
+HGR0000089,78,M,Critical,Alive,BS-EQ-0027,T1,20,Dexamethasone,,FALSE,TRUE
+HGR0000091,35,M,Moderate,Alive,BS-EQ-0004,T0,20,,,FALSE,FALSE
+HGR0000092,45,M,Critical,Alive,BS-EQ-0012,T0,11,Dexamethasone,Mechanical Ventilation,FALSE,TRUE
+HGR0000092,45,M,Critical,Alive,BS-EQ-0012,T1,18,Dexamethasone,,FALSE,TRUE
+HGR0000093,70,M,Critical,Alive,BS-EQ-0008,T0,11,Steroids*,,FALSE,TRUE
+HGR0000093,70,M,Critical,Alive,BS-EQ-0008,T1,17,Steroids*,,FALSE,TRUE
+HGR0000094,61,M,Critical,Alive,BS-EQ-0007,T0,6,Dexamethasone,Tracheostomy,FALSE,TRUE
+HGR0000094,61,M,Critical,Alive,BS-EQ-0007,T1,13,Dexamethasone,Tracheostomy,FALSE,TRUE
+HGR0000098,60,M,Critical,Alive,BS-EQ-0009,T0,,Dexamethasone,Non-Invasive Ventilation Or High Flow Oxygen*,FALSE,TRUE
+HGR0000101,73,M,Critical,Alive,BS-EQ-0011,T0,8,Dexamethasone,Venturi Mask* CPAP*,FALSE,TRUE
+HGR0000101,73,M,Critical,Alive,BS-EQ-0011,T1,14,Dexamethasone,Venturi Mask* CPAP*,FALSE,TRUE
+HGR0000101,73,M,Critical,Alive,BS-EQ-0011,T3,27,Dexamethasone - Ongoing as of 4/20*,,FALSE,TRUE
+HGR0000102,58,M,Critical,Alive,BS-EQ-0010,T1,17,,,FALSE,FALSE
+HGR0000102,58,M,Critical,Alive,BS-EQ-0010,T0,10,,,FALSE,FALSE
+HGR0000110,73,M,Critical,Deceased,BS-EQ-0013,T0,3,Steroids* Dexamethasone,Nasal Cannula*,FALSE,TRUE
+HGR0000115,24,M,Severe,Alive,BS-EQ-0032,T1,11,,,FALSE,FALSE
+HGR0000124,79,M,Critical,Alive,BS-EQ-0021,T0,36,,,FALSE,FALSE
+HGR0000124,79,M,Critical,Alive,BS-EQ-0021,T1,49,,,FALSE,FALSE
+HGR0000134,53,M,Critical,Alive,BS-EQ-0017,T1,22,,,FALSE,FALSE
+HGR0000134,53,M,Critical,Alive,BS-EQ-0017,T0,16,,,FALSE,FALSE
+HGR0000135,59,M,Critical,Alive,BS-EQ-0018,T0,10,,,FALSE,FALSE
+HGR0000135,59,M,Critical,Alive,BS-EQ-0018,T1,16,Dexamethasone,,FALSE,TRUE
+HGR0000136,57,F,Moderate,Alive,BS-EQ-0019,T0,17,,,FALSE,FALSE
+HGR0000137,79,F,Severe,Alive,BS-EQ-0020,T0,4,,,FALSE,FALSE
+HGR0000141,76,M,Critical,Deceased,BS-EQ-0022,T0,20,Steroids*,Face Mask*,FALSE,TRUE
+HGR0000142,49,M,Critical,Alive,BS-EQ-0023,T0,12,,Reservoir Mask*,FALSE,FALSE
+HGR0000143,54,F,Critical,Alive,BS-EQ-0024,T0,8,Steroids* Dexamethasone,Venturi Mask - to 60 %* Nasal Cannula - to high flow*,FALSE,TRUE
+HGR0000144,84,F,Severe,Alive,BS-EQ-0028,T0,15,,Venturi Mask*,FALSE,FALSE
+HGR0000144,84,F,Severe,Alive,BS-EQ-0028,T2,28,,Venturi Mask*,FALSE,FALSE
+HGR0000391,66,M,Critical,Alive,BS-EQ-0029,T0,6,Dexamethasone,Oxygen - endotracheal intubation*,FALSE,TRUE
+HGR0000392,52,M,Critical,Alive,BS-EQ-0033,T0,2,,,FALSE,FALSE
+HGR0000392,52,M,Critical,Alive,BS-EQ-0033,T3,13,,,FALSE,FALSE
+HGR0000395,50,M,Severe,Alive,BS-EQ-0034,T0,14,,,FALSE,FALSE
+HGR0000418,50,M,Critical,Alive,BS-EQ-0036,T1,32,,,FALSE,FALSE
+HGR0000429,54,M,Severe,Alive,BS-EQ-0043,T2,28,,,FALSE,FALSE
+HGR0000429,54,M,Severe,Alive,BS-EQ-0043,T1,26,,,FALSE,FALSE
+HGR0000430,77,M,Critical,Deceased,BS-EQ-0044,T1,20,Steroids* Dexamethasone,,FALSE,TRUE

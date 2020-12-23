@@ -1,0 +1,93 @@
+#Run scripts in this order
+
+###  DE resulsts and figures for main clusters  ###
+
+#pseudobulk_pooling 
+bash pseudobulk_pooling/pool_main_clusters/sm_call_pooling
+
+# differential expression
+bash differential_expression/covid_de_pipeline/sm_call_t0_covid
+bash differential_expression/covid_de_pipeline/sm_call_t0_whealthy
+bash differential_expression/covid_de_pipeline/sm_call_covid_timecourse
+
+#figures
+Rscript figures/gsea_bubble_plots.R
+Rscript figures/fig3_heatmap_and_scatterplots.R
+Rscript figures/dsm_steroid_enrichment.R
+
+### DE resulsts and figures for expanded T cell CITE proteins and RNA ###
+
+#TCR data processing
+Rscript tcr_processing/A_compile_tcr_data_2020-07-28.R
+Rscript tcr_processing/B_define_expansion.R
+
+#pseudobulk_pooling and differential expression CITE
+#pooling
+bash pseudobulk_pooling/pool_expanded_clone_CITE/sm_call_pooling
+#DE 
+bash differential_expression/expanded_clone_pseudobulk_CITE_DE/sm_call_t0_covid
+bash differential_expression/expanded_clone_pseudobulk_CITE_DE/sm_call_t0_whealthy
+bash differential_expression/expanded_clone_pseudobulk_CITE_DE/sm_call_covid_timecourse
+
+#figures CITE
+Rscript figures/tcell_exhaustion/exhaustion_fgsea_plots.R
+Rscript figures/tcell_exhaustion/cutoff_markers_grid.R
+Rscript figures/tcell_exhaustion/surface_marker_coefficients_with_pval.R
+
+#pseudobulk_pooling and differential expression RNA
+
+bash pseudobulk_pooling/pool_expanded_clone_RNA/sm_call_pooling
+
+bash differential_expression/expanded_clone_pseudobulk_RNA/sm_call_t0_covid
+bash differential_expression/expanded_clone_pseudobulk_RNA/sm_call_t0_whealthy
+bash differential_expression/expanded_clone_pseudobulk_RNA/sm_call_covid_timecourse
+
+#figures RNA
+Rscript figures/tcell_exhaustion/RNA_surface_marker_coeff_with_pval.R
+
+
+### cell frequency differential abundance models ###
+# run models
+bash differential_expression/covid_de_pipeline_cell_freq/sm_call_master
+#figures
+Rscript figures/fig4_plot_cd4_8_fig4_cluster_volcano.R
+
+
+### Validation with Sculte-Schrepping et al. 2020 ###
+
+#cohort1
+#update metadata to add new columns needed for models
+Rscript validation_schulteschrepping/update_seurat_meta_cohort1.R
+#pooling
+bash validation_schulteschrepping/pseudobulk_pooling/cohort1/sm_call_pooling
+#DE
+bash validation_schulteschrepping/differential_expression/cohort1/sm_call_covid_timecourse
+bash validation_schulteschrepping/differential_expression/cohort1/sm_call_t0_covid
+bash validation_schulteschrepping/differential_expression/cohort1/sm_call_t0_whealthy
+
+#cohort2
+#update metadata to add new columns needed for models
+Rscript validation_schulteschrepping/update_seurat_meta_cohort2.R
+#pooling
+bash validation_schulteschrepping/pseudobulk_pooling/cohort2/sm_call_pooling
+#DE
+bash validation_schulteschrepping/differential_expression/cohort2/sm_call_covid_timecourse
+bash validation_schulteschrepping/differential_expression/cohort2/sm_call_t0_covid
+bash validation_schulteschrepping/differential_expression/cohort2/sm_call_t0_whealthy
+
+#figures
+Rscript figures/validations/NK_fattyacid_gsea_curves_cohorts_1_2.R
+Rscript figures/validations/pdc_apoptosis/check_pdc_apoptosis_le.R
+Rscript figures/validations/pdc_apoptosis/check_pdc_apoptosis_le_severity.R
+Rscript figures/validations/exhaustion_plots.R
+
+
+### T cell clonality ###
+
+#TCR data processing
+Rscript tcr_processing/A_compile_tcr_data_2020-07-28.R
+# run model
+bash tcell_clonality/sm_call
+#figures
+Rscript figures/clonality/plot_pcgroup_onset_assoc_for_paper.R
+

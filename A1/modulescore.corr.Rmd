@@ -1,0 +1,170 @@
+---
+title: "Geneset enrichment scores and cytokine correlation scatter"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(matrixStats)
+library(plyr)
+library(tidyverse)
+library(ggplot2)
+library(Biobase)
+library(reshape2)
+library(ggpubr)
+library(gridExtra)
+source("util_fun/gsvascore.dfwmeta.R")
+```
+
+## Geneset enrichment gsva scores and cytokine correlations
+**Generate Figure 4 B,C,G,I,L**
+```{r input, include=FALSE}
+### get cytokine data
+load("input/covid19.metadata.paper1.RData")
+PC1 <- readRDS("input/citeseq.patient.end.points.RDS")
+PC1$PC1class <-  ifelse(PC1$PC1 > median(PC1$PC1), "PC1_high", "PC1_low")
+PC1$sample_id <- paste(PC1$subject_id, PC1$visit, sep = "_")
+
+IL15 <-  filter(covid19.lab.results, grepl("IL-15",test_name)) %>%
+  mutate(test_value_log10 = log10(test_value+0.01)) %>%
+  mutate(sample_id = paste(subject_id, test_time_point.PBMC, sep = "_"))
+IL15_T0 <- IL15 %>% 
+  dplyr::filter(test_time_point.PBMC == "T0") %>% 
+  dplyr::group_by(sample_id) %>% 
+  dplyr::summarise_at(vars(test_value_log10), mean) %>%
+  dplyr::left_join(PC1, by = "sample_id")
+
+
+### get gsva list data
+# input is the files from output of sample_gsva_dftoelist.R
+PC1_gsva_esetlist <- readRDS("output/module_score_gsva/PC1_PC1_module_score_gsva_filtered_samples_genes_esetlist.rds")
+
+combined_genesets <- c("HALLMARK_TNFA_SIGNALING_VIA_NFKB", 
+                       "HALLMARK_INFLAMMATORY_RESPONSE",
+                       "reactome_Fatty acid metabolism",
+                       "KEGG_CHEMOKINE_SIGNALING_PATHWAY",
+                       "GO_CELLULAR_RESPONSE_TO_INTERLEUKIN_1",
+                       "HALLMARK_MTORC1_SIGNALING")
+
+PC1score_list_df <- getgsvascore_list_df(PC1_gsva_esetlist, combined_genesets)
+PC1t0score_list_df <- PC1score_list_df %>% filter(Timepoint == "T0",pc1_group != "HC") %>%
+  mutate(sample_id = paste(Subject, Timepoint, sep = "_"))
+PC1t0score_list_df <- PC1t0score_list_df %>% 
+  left_join(IL15_T0[,c("sample_id","test_value_log10")], by = "sample_id") %>%
+  mutate(severity_outcome = as.character(severity_outcome))
+```
+
+
+### NK_CD16hi fatty acid metabolism correlations with inflammatory pathways and circulating IL15 level
+```{r, fig.width=9, fig.height=5}
+PC1t0score_list_df_NK <- filter(PC1t0score_list_df, celltype == "NK_CD16hi") %>%
+  melt(id = colnames(.)[-c(2,3,5,6,7,19)])
+
+p <- ggplot(PC1t0score_list_df_NK, aes(x = value, y = `reactome_Fatty acid metabolism`)) +
+  geom_point(shape=21,aes(fill=severity_outcome),size=3, color="white")+
+  scale_fill_manual(name="Severity_outcome",values = c("#374E55FF","#DF8F44FF","#00A1D5FF","#B24745FF")) +
+  geom_smooth(se = F,method = "lm") + 
+  stat_cor(method = "pearson") +
+  facet_wrap(~variable, scales = "free") +
+  theme_bw()
+
+p
+
+# ggsave(filename = "FAvs.score.IL15.NK.pdf", plot = p, device = "pdf", width = 9, height = 5)
+```
+
+
+### NK_CD16hi fatty acid metabolism correlations with IFG mRNA level
+input is the pseudobulk eset_list object from pseudobulk.normalize.esetlist.R script  
+```{r, fig.width=5, fig.height=3.3}
+# input is the pseudobulk eset_list object from pseudobulk.normalize.esetlist.R script
+eset_list <- readRDS("output/dge_lists/pbulk_eset_list_normalized_WCTcourse_metafiltered.rds")
+
+# take T0 only and remove technical CHI014 control
+eset_list_T0 <- lapply(eset_list, function(dge){
+  filter <- colnames(dge)[dge@phenoData@data$Timepoint %in% c("T0", "HC") & 
+                            !is.na(dge@phenoData@data$PC1_cat) & 
+                            dge@phenoData@data$Donor != "CHI014"]
+  dge <- dge[,filter]
+})
+
+combined_genes <- c("IFNG")
+exprs_list_df <- getgsvascore_list_df(eset_list_T0, combined_genesets = combined_genes)
+
+exprs_list_df <- exprs_list_df %>% filter(Timepoint == "T0",pc1_group != "HC") %>%
+  mutate(sample_id = paste(Subject, Timepoint, sep = "_"))
+
+exprs_list_df_NK <- exprs_list_df %>%
+  filter(celltype == "NK_CD16hi") %>%
+  left_join(PC1t0score_list_df, by = c("sample_id","celltype"))
+
+p <- ggplot(exprs_list_df_NK, aes(x = IFNG, y = `reactome_Fatty acid metabolism`)) +
+  geom_point(shape=21,aes(fill=severity_outcome.x),size=3, color="white")+
+  scale_fill_manual(name="Severity_outcome",values = c("#374E55FF","#DF8F44FF","#00A1D5FF","#B24745FF")) +
+  geom_smooth(se = F,method = "lm") + 
+  stat_cor(method = "pearson") +
+  theme_bw()
+
+p
+# ggsave(filename = "FAvs.score.IL15.NK.pdf", plot = p, device = "pdf", width = 5, height = 3.3)
+
+```
+
+
+
+### circulating IL15 correlation with severity at T0
+```{r, fig.width=5, fig.height=3.3}
+#extract only CITEseq T0 samples
+IL15_T0 <- filter(IL15_T0, !is.na(subject_id)) %>%
+  filter(sample_id %in% unique(PC1t0score_list_df$sample_id))
+IL15_T0$severity.outcome <- paste(IL15_T0$severity, IL15_T0$outcome, sep="-")
+p <- ggplot(IL15_T0, aes(x = test_value_log10, y = PC1)) +
+  geom_point(shape=21,aes(fill=severity.outcome),size=3, color="white")+
+  scale_fill_manual(name="Severity_outcome",values = c("#374E55FF","#DF8F44FF","#00A1D5FF","#B24745FF"))+
+  geom_smooth(se = F,method = "lm") + 
+  stat_cor(method = "pearson") +
+  theme_bw()
+
+p
+# ggsave(filename = "output/IL15vsPC1.pdf", plot = p, device = "pdf", width = 5, height = 3.3)
+```
+
+
+### circulating IL15 change overtime -- figure 4L
+```{r, fig.width=5, fig.height=3.3}
+covid19.samples.pbmc <- covid19.samples[covid19.samples$material_type == "PBMC",] %>%
+  mutate(sample_id = paste(subject_id, visit, sep = "_"))
+
+IL15_alltime <- IL15 %>% 
+  filter(subject_id %in% unique(PC1$subject_id)) %>%
+  group_by(sample_id) %>% 
+  dplyr::summarise_at(vars(test_value_log10), mean) %>%
+  left_join(covid19.samples.pbmc, by = "sample_id") %>%
+  filter(!is.na(days_from_symptom_onset_to_sample_drawn)) %>%
+  left_join(PC1[,which(colnames(PC1) %in% c("subject_id", "PC1", "PC1class"))], by = "subject_id") %>%
+  mutate(PC1class = factor(PC1class, levels = c("PC1_low","PC1_high")))
+
+p <- ggplot(IL15_alltime)+
+  geom_point(alpha=.4, shape=21,
+             aes(x = days_from_symptom_onset_to_sample_drawn, y = test_value_log10, fill=PC1class), size = 3.5)+
+  scale_fill_manual(name="Severity", values = c("deepskyblue1","red")) +
+  geom_line(aes(x = days_from_symptom_onset_to_sample_drawn, y = test_value_log10, group = subject_id), alpha = 0.2)+
+  stat_summary(aes(x = days_from_symptom_onset_to_sample_drawn, y = test_value_log10, group = PC1class), fun = median, alpha=0)+
+  stat_smooth(aes(x = days_from_symptom_onset_to_sample_drawn, y = test_value_log10, group = PC1class, color=PC1class), se = TRUE, alpha=0.1, size = 1.5)+# group = 1 overwrite group id
+  scale_color_manual(name="PC1 Class",values=c("deepskyblue1","red"))+
+  geom_vline(xintercept = 20, color = "grey60", linetype='dashed')+
+  theme(axis.text.x = element_text(angle = 90))+
+  facet_wrap(~condition)+
+  theme_bw()
+p
+
+# ggsave(filename = "output/IL15.TSO.pdf", plot = p, device = "pdf", width = 5, height = 3.3)
+
+```
+
+
+```{r}
+sI <- sessionInfo()
+utils:::print.sessionInfo(sI[-c(10,11)])
+```

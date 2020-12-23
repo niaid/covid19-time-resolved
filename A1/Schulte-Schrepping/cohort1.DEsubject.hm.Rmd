@@ -1,0 +1,168 @@
+---
+title: "Pseudobulk gene expression heatmaps -- Schulte-Schrepping et al, 2020, Cell"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(edgeR)
+library(Biobase)
+library(tidyverse)
+library(openxlsx)
+library(ComplexHeatmap)
+library(pheatmap)
+library(circlize)
+source("../util_fun/external.data.subject.LE.hm.funs.R")
+```
+
+## Pseudobulk gene expression heatmaps -- Schulte-Schrepping et al
+## cohort1
+**Generate Figure S3E; Figure S4C** 
+
+input data from pseudobulk eset object -- output from Schulte-Schrepping pseudobulk object generation pipeline  
+
+```{r input}
+DGE_IN_PATH <- "../input/SchulteSchrepping/"
+g_cohort1.idcelltype <- readRDS(paste(DGE_IN_PATH, "cohort1/id.celltype.rds", sep = ""))
+
+eset_list <- lapply(g_cohort1.idcelltype, function(dge){
+  mat <- cpm(dge$counts, log = TRUE)
+  meta <- dge$samples
+  ExpressionSet(assayData = mat, phenoData = AnnotatedDataFrame(meta))
+})
+
+# get only the first timepoint for each subject
+eset_list_T0 <- lapply(eset_list, function(dge){
+  filter <- colnames(dge)[dge@phenoData@data$Timepoint %in% c("T0","HC")]
+  dge@phenoData@data$group <- factor(dge$group, levels = c("control","mild","severe"))
+  dge <- dge[,filter]
+})
+
+# read in pathway_summary
+pathways <- read.xlsx("../input/selected_pathway_summary.xlsx", sheet = "reduced", startRow = 1)
+IFNsets <- filter(pathways, Category %in% c("Type I IFN response", 
+                                            "Vaccine_infection induced early blood transcriptomic signature"))
+Agpresets <- filter(pathways, Primary_gene_sets %in% c("KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION"))
+translationsets <- filter(pathways, Category %in% c("Translation/ribosome"))
+NFkBsets <- filter(pathways, Primary_gene_sets %in% c("HALLMARK_TNFA_SIGNALING_VIA_NFKB"))
+cyclesets <- c("btm_M4.1_cell cycle (I)","btm_M4.0_cell cycle and transcription")
+apoptsets <- filter(pathways, Category %in% c("Apoptosis and cell death"))
+inflamsets <- filter(pathways, Primary_gene_sets %in% c("HALLMARK_INFLAMMATORY_RESPONSE"))
+oxphossets <- filter(pathways, Primary_gene_sets %in% c("KEGG_OXIDATIVE_PHOSPHORYLATION"))
+fattysets <- filter(pathways, Primary_gene_sets %in% c("reactome_Fatty acid metabolism"))
+chemoksets <- filter(pathways, Primary_gene_sets %in% c("KEGG_CHEMOKINE_SIGNALING_PATHWAY","GO_CELLULAR_RESPONSE_TO_INTERLEUKIN_1"))
+```
+  
+  
+### pDC
+#### apoptosis/cell death
+showing the apoptosis signature (union LE genes of COVID19vsHCs and association with DSM) from our cohort that driving the difference of COVID19 and severity 
+```{r, fig.width=10, fig.height=5}
+DGE_IN_PATH2 <- "../input/differential_expression/fgsea_tables/"
+pDC <- eset_list_T0$`8_pDCs`
+pDC_PC1 <- read.delim(paste0(DGE_IN_PATH2, "PC1/pDC--model@PC1--coef@PC1--fgsea.tsv"), header = TRUE)
+pDC_covid <- read.delim(paste0(DGE_IN_PATH2, "COVID-Healthy/pDC--model@healthy_vs_covid--coef@COVID-Healthy--fgsea.tsv"), header = TRUE)
+
+pDC_PC1_apopt <- pDC_PC1 %>% filter(pDC_PC1$pathway %in% apoptsets$Primary_gene_sets)
+pDC_covid_apopt <- pDC_covid %>% filter(pDC_covid$pathway %in% apoptsets$Primary_gene_sets)
+pDC_PC1_apopt_LE <- unique(unlist(sapply(pDC_PC1_apopt$leadingEdge, function(x) str_split(x, pattern = " "))))
+pDC_covid_apopt_LE <- unique(unlist(sapply(pDC_covid_apopt$leadingEdge, function(x) str_split(x, pattern = " "))))
+pDC_apopt_LE <- intersect(pDC_PC1_apopt_LE,pDC_covid_apopt_LE)
+
+pDC_mtx_union <- exprs(pDC)[union(pDC_PC1_apopt_LE,pDC_covid_apopt_LE), ]
+meta <- pData(pDC) %>% dplyr::arrange(group,who_per_sample)
+pDC_mtx_union <- pDC_mtx_union[,rownames(meta)]
+
+# customize pDC LE heatmap
+# set marked genesets
+PC1_COVID <- rownames(pDC_mtx_union) %in% pDC_apopt_LE
+oxi_stress_LE <- filter(pDC_PC1, pathway %in% "reactome_Oxidative Stress Induced Senescence")$leadingEdge
+oxi_stress <- rownames(pDC_mtx_union) %in% unlist(str_split(oxi_stress_LE, pattern = " "))
+names(oxi_stress) <- rownames(pDC_mtx_union)
+
+label <- which(rownames(pDC_mtx_union) %in% union(pDC_PC1_apopt_LE,pDC_covid_apopt_LE)[1:24])
+label_genes <- rownames(pDC_mtx_union)[label]
+
+# set colors
+col_fun = colorRamp2(c(-1.5, 0, 1.5), c("#FF00FF", "#000000", "#FFFF00"))
+who.color <- colorRamp2(c(0, 7), c("white", "#e97171"))
+severity.color <- c("control"="#00BA38", "mild"="#619CFF", "severe"="#F8766D")
+
+# set heatmap annotation
+ha = HeatmapAnnotation(
+  severity = meta$group,
+  who = meta$who_per_sample, 
+  col = list(who = who.color,
+             severity = severity.color)
+)
+
+# pdf("../SchulteSchrepping/output/Subjecthm_pDC_unionLE_apopt_extLE.pdf", width = 10, height = 5)
+colnames(pDC_mtx_union) <- meta$n_barcodes
+p <- Heatmap(pheatmap:::scale_rows(pDC_mtx_union), name = paste("pDC", "apopt", sep = "_"), 
+             show_column_names = TRUE,
+             top_annotation = ha, cluster_columns = FALSE,
+             column_split = meta$group,
+             row_split = PC1_COVID,
+             col = col_fun,
+             # row_names_gp = gpar(col = c("blue", "black"), fontsize = c(10, 10)),
+             column_gap = unit(2, "mm"),
+             row_gap = unit(2, "mm")
+)+
+  Heatmap(PC1_COVID + 0, name = "coLE", col = c("0" = "white", "1" = "blue"), 
+          show_heatmap_legend = FALSE, width = unit(5, "mm")) +
+  Heatmap(oxi_stress + 0, name = "OxiSenes", col = c("0" = "white", "1" = "green"), 
+          show_row_names = TRUE, row_names_gp = gpar(fontsize = 8),
+          show_heatmap_legend = FALSE, width = unit(5, "mm"))+
+  rowAnnotation(foo = anno_mark(at = label,
+                                labels = label_genes,
+                                labels_gp = gpar(fontsize = 12)))
+p
+# dev.off()
+```
+  
+  
+### NK cells
+#### Fatty acid metabolism
+input LE genes from the DE and FGSEA test of cohort1 T0 and T0+healthy comparisons  
+
+```{r, fig.width=10, fig.height=5.2}
+NK_CD16hi <- eset_list_T0$`15_NK cells`
+# cohort1 LE
+NK_CD16hi_PC1 <- read.delim(paste0(DGE_IN_PATH, "cohort1/fgsea_tables/severe-mild/15_NK cells--model@severity--coef@severe-mild--fgsea.tsv"), header = TRUE)
+NK_CD16hi_covid <- read.delim(paste0(DGE_IN_PATH, "cohort1/fgsea_tables/COVID-Healthy/15_NK cells--model@healthy_vs_covid--coef@COVID-Healthy--fgsea.tsv"), header = TRUE)
+
+NK_CD16hi_PC1_fatty <- NK_CD16hi_PC1 %>% filter(NK_CD16hi_PC1$pathway %in% fattysets$Primary_gene_sets)
+NK_CD16hi_covid_fatty <- NK_CD16hi_covid %>% filter(NK_CD16hi_covid$pathway %in% fattysets$Primary_gene_sets)
+NK_CD16hi_PC1_fatty_LE <- unique(unlist(sapply(NK_CD16hi_PC1_fatty$leadingEdge, function(x) str_split(x, pattern = " "))))
+NK_CD16hi_covid_fatty_LE <- unique(unlist(sapply(NK_CD16hi_covid_fatty$leadingEdge, function(x) str_split(x, pattern = " "))))
+NK_CD16hi_fatty_LE <- intersect(NK_CD16hi_PC1_fatty_LE,NK_CD16hi_covid_fatty_LE)
+
+NK_CD16hi_mtx_PC1 <- exprs(NK_CD16hi)[NK_CD16hi_PC1_fatty_LE, ]
+meta <- pData(NK_CD16hi) %>% dplyr::arrange(group,who_per_sample) 
+NK_CD16hi_mtx_PC1 <- NK_CD16hi_mtx_PC1[,rownames(meta)]
+
+# get classifications of FA LE genes
+catabolicgene <- read.xlsx("../input/fatty acid LE NK gene categories_cohort1.xlsx", sheet = "catabolic", rowNames = TRUE, colNames = TRUE)$Gene.Symbol
+biosyngene <- read.xlsx("../input/fatty acid LE NK gene categories_cohort1.xlsx", sheet = "biosynthetic", rowNames = TRUE, colNames = TRUE)$Gene.Symbol
+fatty_NK <- vector(length = nrow(NK_CD16hi_mtx_PC1))
+fatty_NK <- replace(fatty_NK, which(rownames(NK_CD16hi_mtx_PC1) %in% biosyngene), "biosynthetic")
+fatty_NK <- replace(fatty_NK, which(rownames(NK_CD16hi_mtx_PC1) %in% catabolicgene), "catabolic")
+fatty_NK <- replace(fatty_NK, which(fatty_NK == "FALSE"), "others")
+names(fatty_NK) <- rownames(NK_CD16hi_mtx_PC1)
+
+# pdf("../SchulteSchrepping/output/Subjecthm_NK_PC1LE_fatty_cohort1.pdf", width = 10, height = 5.2)
+subject.hm.PC1(exprs_mtx = NK_CD16hi_mtx_PC1, meta = meta, celltype = "NK", 
+               module = "fatty",PC1LEset = NK_CD16hi_PC1_fatty_LE, 
+               covidLEset = NK_CD16hi_covid_fatty_LE,
+               rowsplit=2, othergroup=fatty_NK)
+# dev.off()
+
+```
+
+
+```{r}
+sI <- sessionInfo()
+utils:::print.sessionInfo(sI[-c(10,11)])
+```
+

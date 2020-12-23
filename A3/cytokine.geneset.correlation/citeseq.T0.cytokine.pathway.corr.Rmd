@@ -1,0 +1,197 @@
+---
+title: "T0 Correlation between Gene Set and Cytokine Expression"
+output: 
+  html_document:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+Calculate the correlation of cytokine level and gene set module scores of T0 samples of in the CITESEQ cohort
+```{r setup, include=FALSE}
+data.folder <- "input.data"
+output.folder <- "output/cytokine.geneset.correlation"
+dir.create(output.folder,recursive = T)
+library(knitr)
+library(ggplot2)
+library(Biobase)
+library(ggsci)
+library(pheatmap)
+knitr::opts_chunk$set(echo = TRUE)
+options(stringsAsFactors = FALSE)
+opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+severity.color <- c("Critical-Alive"="#374E55FF","Critical-Deceased"="#DF8F44FF","Moderate-Alive"="#00A1D5FF" ,"Severe-Alive"="#B24745FF")
+```
+
+### Import Data
+Use GSVA scores from the PC1_module_score_gsva_filtered_samples_genes file, which was created using edge genes of GSEA of PC1 coefficients.
+```{r import.data}
+# selected gene sets from Fig 3 to analyse
+selected.gene.sets <- read.csv(file.path(data.folder,"pathway_summary.csv"))
+
+# GSEA stats
+# gene sets that are sig. in GSEA (or in manual node list) and are of interest
+gsea.res <- read.csv(file.path(data.folder,"gene.set.scores.and.gsea.csv"))
+gsea.res$cell.type.pathway <- paste0(gsea.res$pathway,"_",gsea.res$celltype)
+sig.gsea.res <- subset(gsea.res,PC1continuous_padj <= 0.2)
+
+# gsva module scores
+module.score.type <- "PC1_PC1_module_score_gsva_filtered_samples_genes"
+#module.score.type <- "healthy_vs_covid_COVID-Healthy_module_score_gsva_filtered_samples_genes"
+gsva.scores <- readRDS(file.path(data.folder,paste0(module.score.type,".rds")))
+gsva.scores$cell.type.pathway <- paste0(gsva.scores$pathway,"_",gsva.scores$celltype)
+# keep only those that are sig. in GSEA
+sig.gsva.scores <- subset(gsva.scores,cell.type.pathway %in% sig.gsea.res$cell.type.pathway & pathway %in% selected.gene.sets$Primary_gene_sets)
+sig.gsva.scores[,c("subject_id","visit","batch")] <- do.call("rbind",sapply(as.character(sig.gsva.scores$sample),strsplit,"_"))
+
+# metadata
+load(file.path(data.folder,"covid19.metadata.paper1.RData"),verbose=T)
+dsm.data <- readRDS(file.path(output.folder,"..","DSM","citeseq.patient.end.points.RDS"))
+covid19.patient.demo$PC1 <- dsm.data[covid19.patient.demo$subject_id,]$PC1
+sig.gsva.scores <- merge(sig.gsva.scores,subset(covid19.samples,material_type == "PBMC")[,c("subject_id","sample_label","visit","days_from_admission_to_sample_drawn")],
+                         by=c("subject_id","visit"),all.x=T)
+
+
+# cytokine data for patients with module scores
+cytokine.data <- subset(covid19.lab.results,test_type == "ELISA" & subject_id %in% sig.gsva.scores$subject_id)
+cytokine.labels <- as.character(unique(cytokine.data$test_name))
+names(cytokine.labels) <- unique(cytokine.data$test_id)
+cytokine.data$test_value_log10 <- log10(cytokine.data$test_value + 0.01)
+cytokine.data <- reshape2::dcast(cytokine.data,subject_id + days_from_admission_to_test ~ test_id,value.var = "test_value_log10",fun.aggregate = mean)
+cytokine.data <- merge(unique(sig.gsva.scores[,c("subject_id","sample_label","visit","days_from_admission_to_sample_drawn")]),cytokine.data,
+                       by.x=c("subject_id","days_from_admission_to_sample_drawn"),by.y=c("subject_id","days_from_admission_to_test"),all.x = T)
+```
+
+### Correlation
+Calculate the correlation between cytokine levels and gene set expression for 28 T0 samples
+```{r corr}
+module.score.type <- substring(module.score.type,0,3)
+# T0 cytokine data
+t0.cytokine.data <- subset(cytokine.data,visit == "T0")
+
+# T0 gene set scores
+t0.gsva.scores <- reshape2::dcast(subset(sig.gsva.scores,visit=="T0"),subject_id + visit ~ cell.type.pathway,value.var = "module.score")
+t0.gsva.scores <- t0.gsva.scores[match(t0.cytokine.data$subject_id,t0.gsva.scores$subject_id),]
+    
+# spearman correlation
+corr.method = "spearman"
+cytokine.geneset.cor <- psych::corr.test(t0.cytokine.data[,-c(1:5)],t0.gsva.scores[,-c(1:2)],adjust = "none",method = corr.method)
+cytokine.geneset.cor$fdr <- apply(cytokine.geneset.cor$p,2,p.adjust,method="fdr") 
+
+display.corr <- t(cytokine.geneset.cor$r[,unique(which(cytokine.geneset.cor$fdr < 0.05,arr.ind = T)[,2])])
+display.sig <- round(t(cytokine.geneset.cor$fdr[,unique(which(cytokine.geneset.cor$fdr < 0.05,arr.ind = T)[,2])]),3)
+display.sig[which(display.sig > 0.05)] <- ""
+display.sig[which(display.sig != "")] <- "\u00b7"
+hm <- pheatmap(display.corr,color = viridis::viridis_pal()(101),display_numbers = display.sig,number_color = "red",fontsize = 7,fontsize_number = 18,
+         main=paste0(corr.method,"'s correlation of T0 samples"),border_color = "white",labels_col = cytokine.labels[colnames(display.corr)],
+         filename = file.path(output.folder,paste0("cytokine.geneset.correlation.",corr.method,".",module.score.type,".pdf")),
+         cellwidth = 7,cellheight = 7)
+
+corr1 <- data.frame(reshape2::melt(cytokine.geneset.cor$n),r=reshape2::melt(cytokine.geneset.cor$r)[,3],
+                p=reshape2::melt(cytokine.geneset.cor$p)[,3],fdr=reshape2::melt(cytokine.geneset.cor$fdr)[,3])
+
+# pearson correlation
+corr.method = "pearson"
+cytokine.geneset.cor <- psych::corr.test(t0.cytokine.data[,-c(1:5)],t0.gsva.scores[,-c(1:2)],adjust = "none",method = corr.method)
+cytokine.geneset.cor$fdr <- apply(cytokine.geneset.cor$p,2,p.adjust,method="fdr") 
+
+display.corr <- t(cytokine.geneset.cor$r[,unique(which(cytokine.geneset.cor$fdr < 0.05,arr.ind = T)[,2])])
+display.sig <- round(t(cytokine.geneset.cor$fdr[,unique(which(cytokine.geneset.cor$fdr < 0.05,arr.ind = T)[,2])]),3)
+display.sig[which(display.sig > 0.05)] <- ""
+display.sig[which(display.sig != "")] <- "\u00b7"
+hm <- pheatmap(display.corr,color = viridis::viridis_pal()(101),display_numbers = display.sig,number_color = "red",fontsize = 7,fontsize_number = 18,
+         main=paste0(corr.method,"'s correlation of T0 samples"),border_color = "white",labels_col = cytokine.labels[colnames(display.corr)],
+         filename = file.path(output.folder,paste0("cytokine.geneset.correlation.",corr.method,".",module.score.type,".pdf")),
+         cellwidth = 7,cellheight = 7)
+dev.off()
+corr2 <- data.frame(reshape2::melt(cytokine.geneset.cor$n),r=reshape2::melt(cytokine.geneset.cor$r)[,3],
+                p=reshape2::melt(cytokine.geneset.cor$p)[,3],fdr=reshape2::melt(cytokine.geneset.cor$fdr)[,3])
+
+#write.csv(data.frame(cytokine=cytokine.labels[as.character(corr1$Var1)],spearman=corr1,pearson=corr2),row.names = F,
+#          file=file.path(output.folder,"cytokine.geneset.correlation",paste0("cytokine.geneset.correlation.",module.score.type,".corr.csv")))
+```
+
+### Visualization
+Create scatter plots for selected pairs of cytokines and gene sets
+```{r scatter.plot}
+gene.sets.of.interest <- c("reactome_Oxidative Stress Induced Senescence_pDC","GO_APOPTOTIC_SIGNALING_PATHWAY_pDC","GO_INTRINSIC_APOPTOTIC_SIGNALING_PATHWAY_pDC",
+                           "reactome_Regulation of TP53 Activity_pDC","GO_RESPONSE_TO_TYPE_I_INTERFERON_NK_CD16hi","reactome_Fatty acid metabolism_NK_CD16hi")
+cytokines.of.interest <- c("IL.15","IFN.alpha2a")
+covid19.patient.demo$severity.outcome <- paste0(covid19.patient.demo$severity,"-",covid19.patient.demo$outcome)
+
+for (cytokine in cytokines.of.interest) {
+  for (gs in gene.sets.of.interest) {
+    df <- data.frame(covid19.patient.demo[t0.cytokine.data$subject_id,],source=t0.cytokine.data[,cytokine],target=t0.gsva.scores[,gs])
+    
+    print(ggplot(df,aes(PC1,source)) + 
+      geom_point(aes(fill=severity.outcome),size=3,pch=21,color="white") + scale_fill_manual(values = severity.color) +
+      ggpubr::stat_cor(size=2.5) + theme_bw() + stat_smooth(method="lm",se=F,alpha=0.5,geom="line",color="blue") + xlab("DSM") + ylab(cytokine) + 
+      theme(legend.position = "none",text = element_text(size=7)))
+    df$source.PC1.resid <- resid(lm(source ~ PC1,df))[rownames(df)] 
+    df$target.PC1.resid <- resid(lm(target ~ PC1,df))[rownames(df)] 
+    print(ggplot(df,aes(source.PC1.resid,target.PC1.resid)) + 
+      geom_point(aes(fill=severity.outcome),size=3,pch=21,color="white") + scale_fill_manual(values = severity.color) +
+      ggpubr::stat_cor(size=2.5) + theme_bw() + stat_smooth(method="lm",se=F,alpha=0.5,geom="line",color="blue") + 
+      ylab(paste0(gs,".resid")) + xlab(paste0(cytokine,".resid")) + 
+      theme(legend.position = "none",text = element_text(size=7)))
+  }
+}
+```
+
+### Additional check
+```{r add}
+source.gs <- "reactome_Oxidative Stress Induced Senescence_pDC"
+target.gs <- "GO_APOPTOTIC_SIGNALING_PATHWAY_pDC"
+df <- data.frame(covid19.patient.demo[t0.cytokine.data$subject_id,],source=t0.gsva.scores[,source.gs],target=t0.gsva.scores[,target.gs])
+print(ggplot(subset(df,!is.na(PC1)),aes(source,target)) + 
+        geom_point(aes(fill=severity.outcome),size=3,pch=21,color="white") + scale_fill_manual(values = severity.color) +
+        ggpubr::stat_cor(size=2.5) + theme_bw() + stat_smooth(method="lm",se=F,alpha=0.5,geom="line",color="blue") + xlab(source.gs) + ylab(target.gs) + 
+        theme(legend.position = "none",text = element_text(size=7)))
+
+# differences with steroid use
+# correlation with glucose response
+gene.sets.of.interest <- c("reactome_Fatty acid metabolism_NK_CD16hi","HALLMARK_TNFA_SIGNALING_VIA_NFKB_NK_CD16hi",
+                           "HALLMARK_INFLAMMATORY_RESPONSE_NK_CD16hi","HALLMARK_MTORC1_SIGNALING_NK_CD16hi")
+sample.steroid.info <- read.csv(file.path(data.folder,"pbmc.samples.csv"))
+t0.gsva.scores <- merge(t0.gsva.scores,sample.steroid.info[,c("subject_id","visit","steroid.use")],by=c("subject_id","visit"))
+t0.gsva.scores$steroid.use <- t0.gsva.scores$steroid.use != ""
+glucResponseGenes_NK_CD16hi <- readRDS(file.path(data.folder,"glucResponseGenesforModel_module_score_gsva_filtered_samples_genes.rds"))
+glucResponseGenes_NK_CD16hi <- subset(glucResponseGenes_NK_CD16hi,celltype == "NK_CD16hi")
+glucResponseGenes_NK_CD16hi <- glucResponseGenes_NK_CD16hi[grep("T0",glucResponseGenes_NK_CD16hi$sample),]
+glucResponseGenes_NK_CD16hi$subject_id <- sapply(as.character(glucResponseGenes_NK_CD16hi$sample),function(x){unlist(strsplit(x,"_"))[[1]]})
+t0.gsva.scores.melted <- reshape2::melt(cbind(t0.gsva.scores,subject_id=rownames(t0.gsva.scores)),measure.vars=gene.sets.of.interest)
+t0.gsva.scores.melted$variable <- gsub("_NK_CD16hi","",t0.gsva.scores.melted$variable)
+t0.gsva.scores.melted$glucResponseGenes_NK_CD16hi <- glucResponseGenes_NK_CD16hi[match(t0.gsva.scores.melted$subject_id,
+                                                                                       glucResponseGenes_NK_CD16hi$subject_id),"module.score"]
+t0.gsva.scores.melted <- data.frame(covid19.patient.demo[t0.gsva.scores.melted$subject_id,],
+                                    t0.gsva.scores.melted[,c("steroid.use","variable","value","glucResponseGenes_NK_CD16hi")])
+#pdf(file.path(output.folder,"NK_steroid_response.pdf"),width=4,height=4)
+ggplot(subset(t0.gsva.scores.melted,!is.na(PC1)),aes(glucResponseGenes_NK_CD16hi,value,group=steroid.use)) + 
+  geom_point(aes(fill=severity.outcome,shape=steroid.use),size=2,color="white") + scale_fill_manual(values = severity.color) +
+  ggpubr::stat_cor(size=2.5) + theme_bw() + stat_smooth(method="lm",se=F,alpha=0.5,size=1,geom="line",aes(color=steroid.use)) + 
+  scale_shape_manual(values=c(22,21)) + scale_color_d3() +
+  theme(legend.position = "none",text = element_text(size=7)) + facet_wrap(.~variable) + ylab("Module Score")
+#dev.off()
+
+# correlation with steroid-linked gene - TSC22d3
+tsc22d3.expr <- readRDS(file.path(data.folder,"NK_CD16hi_TSC22D3.exp.RDS"))
+t0.tsc22d3.expr <- exprs(tsc22d3.expr[,grep("T0",colnames(tsc22d3.expr))])
+colnames(t0.tsc22d3.expr) <- sapply(colnames(t0.tsc22d3.expr),function(x){unlist(strsplit(x,"_"))[[1]]})
+t0.gsva.scores.melted <- reshape2::melt(cbind(t0.gsva.scores,subject_id=rownames(t0.gsva.scores)),measure.vars=gene.sets.of.interest)
+t0.gsva.scores.melted$TSC22D3.expr <- t0.tsc22d3.expr[,match(t0.gsva.scores.melted$subject_id,colnames(t0.tsc22d3.expr))]
+t0.gsva.scores.melted <- data.frame(covid19.patient.demo[t0.gsva.scores.melted$subject_id,],t0.gsva.scores.melted[,c("steroid.use","variable","value","TSC22D3.expr")])
+#pdf(file.path(output.folder,"NK_TSC22D3_corr.pdf"),width=4,height=4)
+t0.gsva.scores.melted$variable <- gsub("_NK_CD16hi","",t0.gsva.scores.melted$variable)
+ggplot(subset(t0.gsva.scores.melted,!is.na(PC1)),aes(TSC22D3.expr,value,group=steroid.use)) +
+  geom_point(aes(fill=severity.outcome,shape=steroid.use),size=2,color="white") + scale_fill_manual(values = severity.color) +
+  ggpubr::stat_cor(size=2.5) + theme_bw() + stat_smooth(method="lm",se=F,alpha=0.5,geom="line",aes(color=steroid.use)) +
+  scale_shape_manual(values=c(22,21)) + scale_color_d3() +
+  theme(legend.position = "none",text = element_text(size=7)) + facet_wrap(.~variable) + ylab("Scores") + xlab("TSC22D3 mRNA")
+#dev.off()
+```
+
+### Session Info
+```{r save}
+sessionInfo()
+```

@@ -1,0 +1,103 @@
+---
+title: "Effect size (NES) of DSM_high and DSM_low TSO association IFN plot"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(openxlsx)
+library(reshape2)
+library(ggrepel)
+```
+
+## Effect size (NES) of DSM_high and DSM_low with TSO association respectively
+#### using type-I IFN response as an example
+**Generate Figure 3E**  
+
+read in enrichment results tables and filter selected pathways for each celltype
+Enrichment results from PC1/DSM group and continuous days_since_onset (TSO) interaction model reflecting the association with TSO in DSM high and DSM low groups respectively  
+
+```{r input}
+# filter selected pathways for each celltype
+FGSEA_IN_PATH_HIGH <- "input/differential_expression/fgsea_tables/days_onset_in_PC1high"
+FGSEA_IN_PATH_LOW <- "input/differential_expression/fgsea_tables/days_onset_in_PC1low"
+FGSEA_IN_PATH_DIFF <- "input/differential_expression/fgsea_tables/diff_days_onset_PC1high-low"
+remove_celltype_high <- paste(FGSEA_IN_PATH_HIGH, c("/Dblt", "/DPT", "/gated_out", "/PB_Plasmablasts", "/TissueResMemT", "/Unknown", "/Granulocytes"), "--model@PC1group_onsetcontinous_interaction--coef@days_onset_in_PC1high--fgsea.tsv", sep = "")
+remove_celltype_low <- paste(FGSEA_IN_PATH_LOW, c("/Dblt", "/DPT", "/gated_out", "/PB_Plasmablasts", "/TissueResMemT", "/Unknown", "/Granulocytes"), "--model@PC1group_onsetcontinous_interaction--coef@days_onset_in_PC1low--fgsea.tsv", sep = "")
+remove_celltype_diff <- paste(FGSEA_IN_PATH_DIFF, c("/Dblt", "/DPT", "/gated_out", "/PB_Plasmablasts", "/TissueResMemT", "/Unknown", "/Granulocytes"), "--model@PC1group_onsetcontinous_interaction--coef@diff_days_onset_PC1High-low--fgsea.tsv", sep = "")
+
+files_high <- list.files(FGSEA_IN_PATH_HIGH, full.names = TRUE)
+files_high <- files_high[-which(files_high %in% remove_celltype_high)]
+files_low <- list.files(FGSEA_IN_PATH_LOW, full.names = TRUE)
+files_low <- files_low[-which(files_low %in% remove_celltype_low)]
+files_diff <- list.files(FGSEA_IN_PATH_DIFF, full.names = TRUE)
+files_diff <- files_diff[-which(files_diff %in% remove_celltype_diff)]
+
+fgsea_list_high <- lapply(files_high, function(x) read.delim(x, header = TRUE, sep = "\t"))
+names(fgsea_list_high) <- gsub("--model@PC1group_onsetcontinous_interaction--coef@days_onset_in_PC1high--fgsea\\.tsv", "", basename(files_high))
+fgsea_list_low <- lapply(files_low, function(x) read.delim(x, header = TRUE, sep = "\t"))
+names(fgsea_list_low) <- gsub("--model@PC1group_onsetcontinous_interaction--coef@days_onset_in_PC1low--fgsea\\.tsv", "", basename(files_low))
+fgsea_list_diff <- lapply(files_diff, function(x) read.delim(x, header = TRUE, sep = "\t"))
+names(fgsea_list_diff) <- gsub("--model@PC1group_onsetcontinous_interaction--coef@diff_days_onset_PC1High-low--fgsea\\.tsv", "", basename(files_diff))
+
+
+# read in selected pathways
+pathways <- read.xlsx("input/selected_pathway_summary.xlsx", sheet = "reduced", startRow = 1)
+fgsea_list_high_selected <- lapply(fgsea_list_high, function(x) {filter(x, pathway %in% pathways$Primary_gene_sets)})
+fgsea_list_low_selected <- lapply(fgsea_list_low, function(x) {filter(x, pathway %in% pathways$Primary_gene_sets)})
+fgsea_list_diff_selected <- lapply(fgsea_list_diff, function(x) {filter(x, pathway %in% pathways$Primary_gene_sets)})
+
+fgsea_list_selected <- list()
+for (i in names(fgsea_list_high_selected)) {
+  fgsea_list_selected[[i]] <- bind_rows(fgsea_list_high_selected[[i]], fgsea_list_low_selected[[i]], .id = "PC1_group")
+}
+
+fgsea_selected_df <- bind_rows(fgsea_list_selected, .id = "celltype")
+fgsea_diff_selected_df <- bind_rows(fgsea_list_diff_selected, .id = "celltype")
+
+fgsea_selected_df$PC1_group <- replace(fgsea_selected_df$PC1_group, fgsea_selected_df$PC1_group == "1", "PC1_high")
+fgsea_selected_df$PC1_group <- replace(fgsea_selected_df$PC1_group, fgsea_selected_df$PC1_group == "2", "PC1_low")
+fgsea_selected_df$direction <- ifelse(fgsea_selected_df$NES>0, "up", "dn")
+```
+  
+  
+### plot IFN NES scatter
+```{r, fig.width=6, fig.height=5}
+fgsea_selected_df_IFN <- filter(fgsea_selected_df, pathway %in% c("GO_RESPONSE_TO_TYPE_I_INTERFERON"))
+fgsea_diff_selected_df_IFN <- filter(fgsea_diff_selected_df, pathway %in% c("GO_RESPONSE_TO_TYPE_I_INTERFERON"))
+
+fgsea_selected_df_IFN_wide <- dcast(fgsea_selected_df_IFN, celltype+pathway ~ PC1_group,value.var = "NES") %>%
+  left_join(select(fgsea_diff_selected_df_IFN, "celltype", "padj"), by = "celltype") %>%
+  mutate(diff_padj_sig = padj < 0.05)
+
+p <- ggplot(fgsea_selected_df_IFN_wide, aes(x = PC1_low, y = PC1_high, label = celltype)) +
+  geom_point(aes(color = diff_padj_sig), size = 3) +
+  scale_color_manual(values=c("#495464", "#f05454")) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "blue")+
+  geom_hline(yintercept = 0, linetype = "dashed", color = "#9ba4b4")+
+  geom_vline(xintercept = 0, linetype = "dashed", color = "#9ba4b4")+
+  xlim(-3.2,1.5)+
+  ylim(-3.2,1.5)+
+  theme_bw() +
+  geom_text_repel(
+    data = fgsea_selected_df_IFN_wide,
+    aes(label = celltype),
+    color = "#495464",
+    size = 5,
+    box.padding = unit(0.35, "lines"),
+    point.padding = unit(0.35, "lines")
+    )
+
+p
+# ggsave(filename = "output/TSO_PC1group_NES.pdf", plot = p, device = "pdf", width=6, height = 5)
+
+```
+
+
+```{r}
+sI <- sessionInfo()
+utils:::print.sessionInfo(sI[-c(10,11)])
+```
+

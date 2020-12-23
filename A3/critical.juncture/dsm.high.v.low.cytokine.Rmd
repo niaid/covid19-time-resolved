@@ -1,0 +1,185 @@
+---
+title: "Cytokine Profiles for Brescia Citeseq Patients"
+output: 
+  html_document:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+Compare cytokine profiles of citeseq patients in DSM-high and DSM-low severity groups. Specific focus on 17-23 days since symptom onset.
+```{r setup, include=FALSE}
+data.folder <- "input.data"
+output.folder <- "output/critical.juncture"
+dir.create(output.folder,recursive = T)
+library(knitr)
+library(ggplot2)
+library(ggsci)
+library(ggpubr)
+library(ggfortify)
+library(mgcv)
+library(tidymv)
+library(lme4)
+library(lmerTest)
+library(plsRglm)
+library(precrec)
+knitr::opts_chunk$set(echo = TRUE)
+options(stringsAsFactors = FALSE)
+opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+
+```
+
+### Read Data
+Read patient demo & cytokine data. 
+```{r read.data}
+citeseq.patient.dsm <- readRDS(file.path(output.folder,"..","DSM","citeseq.patient.end.points.RDS"))
+citeseq.patient.dsm$dsm.group <- NA
+citeseq.patient.dsm[citeseq.patient.dsm$PC1 < median(citeseq.patient.dsm$PC1),"dsm.group"] <- "DSM-low"
+citeseq.patient.dsm[citeseq.patient.dsm$PC1 > median(citeseq.patient.dsm$PC1),"dsm.group"] <- "DSM-high"
+table(citeseq.patient.dsm$dsm.group)
+load(file.path(data.folder,"covid19.metadata.paper1.RData"),verbose=T)
+covid19.lab.results$severity.outcome <- paste0(covid19.lab.results$severity,"-",covid19.lab.results$outcome)
+
+severity.color <- c("Critical-Alive"="#374E55FF","Critical-Deceased"="#DF8F44FF","Moderate-Alive"="#00A1D5FF" ,"Severe-Alive"="#B24745FF","HC" = "#79AF97FF")
+```
+
+
+### Cytokine time course differences
+Compare between dsm-high and dsm-low patients during critical juncture (between 17 and 23 days TSO) and check whether
+any of the cytokines had signficant shift entering the juncture
+```{r profile.pre}
+selected.cytokine.profiles <- subset(covid19.lab.results,subject_id %in% citeseq.patient.dsm$subject_id & test_type == "ELISA" & 
+                                       !is.na(days_from_symptom_onset_to_test))
+selected.cytokine.profiles$dsm.group <- citeseq.patient.dsm[selected.cytokine.profiles$subject_id,"dsm.group"]
+parameter.labels <- unique(selected.cytokine.profiles[,c("test_id","test_name")])
+rownames(parameter.labels) <- parameter.labels$test_id
+parameter.labels$test_name <- gsub("/ ","/",parameter.labels$test_name,fixed = T)
+
+# ggplot(subset(selected.cytokine.profiles,test_name=="IL-23"),aes(days_from_symptom_onset_to_test,log10(test_value+1),group=dsm.group)) +
+#   geom_vline(xintercept = 20,color="grey60",linetype="dashed") +
+#   geom_point(alpha=.5,pch=21,aes(fill=dsm.group),size=1) + scale_fill_manual(name="DSM",values=c("red","deepskyblue1")) +
+#   scale_color_manual(name="DSM group",values=c("red","deepskyblue1")) +
+#   geom_smooth(se = T,aes(color=dsm.group),alpha=0.15) + facet_wrap(~test_name,scales = "free") + theme_bw() + #xlim(0,60) +
+#   xlab("Days from Symptom Onset") + ylab("log10 Cytokine Level") + xlim(0,25)
+```
+<br/>
+
+
+#### Differential level within juncture
+Using the model: test_value ~ dsm.group + age.numeric + sex + DFSO + (1|subject_id), for samples within the juncture to identify cytokines
+with sig. differences between the two severity groups
+```{r profile.2,out.width=800,fig.height=10,fig.cap="Figure 2 Coefficient and significance of the severity term in mixed-effect models comparing 63 serum protein levels DSM-low (n=15) relative to DSM-low (n=15) patients around critical juncture (17-23 days TSO; only patients with samples around this period are included in this analysis). Significance is determined by ANOVA unadjusted p ≤ 0.05."}
+# test which one is diverging between 17-23 days for the two groups
+divergence.df <- data.frame()
+form <- test_value ~ dsm.group + age + sex + days_from_symptom_onset_to_test + (1|subject_id)
+for (i in parameter.labels$test_id) {
+  tmp <- subset(selected.cytokine.profiles,test_id == i & days_from_symptom_onset_to_test >= 7 & days_from_symptom_onset_to_test <= 30)
+  if (nrow(tmp) > 20) {
+    tmp$test_value <- scale(log10(tmp$test_value+1))
+    tmp <- subset(tmp, days_from_symptom_onset_to_test >= 17 & days_from_symptom_onset_to_test <= 23)
+    lm.res <- lmer(form,tmp)
+    lm.anova <- anova(lm.res)
+    divergence.df <- rbind(divergence.df,data.frame(cytokine=i,coef=t(fixef(lm.res)),pval = t(lm.anova$`Pr(>F)`),singular=isSingular(lm.res)))
+  } else
+    warning(paste0(i," only has ",nrow(tmp)," samples."))
+}
+parameter.labels <- unique(selected.cytokine.profiles[,c("test_id","test_name")])
+rownames(parameter.labels) <- parameter.labels$test_id
+parameter.labels$test_name <- gsub("/ ","/",parameter.labels$test_name,fixed = T)
+divergence.df$cytokine.label <- parameter.labels[divergence.df$cytokine,"test_name"]
+divergence.df <- divergence.df[order(divergence.df$coef.dsm.groupDSM.low),]
+divergence.df$cytokine.label <- factor(divergence.df$cytokine.label,levels=divergence.df$cytokine.label)
+ggplot(divergence.df,aes(cytokine.label,coef.dsm.groupDSM.low)) + geom_hline(yintercept = 0,linetype="dashed") +
+  geom_point(aes(size=-log10(pval.1),fill=pval.1<=0.05),alpha=0.75,pch=21) + 
+  #geom_point(aes(y=coef.post.20daysTRUE,size=-log10(severity.outcome.pval.2),
+  #               color=singular,fill=severity.outcome.pval.2<=0.05),alpha=0.75,pch=22) + 
+  coord_flip() + ylab("DSM-low Effect Size") + xlab("Cytokine") + labs(title = "DSM-low vs. DSM-high",subtitle = "Cytokine differences between 17 and 23 days TSO") +
+  scale_color_manual(values=c("black","white")) + scale_fill_manual(name="Sig. P-Value",values=c("grey90","lightblue")) +
+  scale_size(name="-log10(p-val)") + theme_bw() + theme(text = element_text(size=8))
+sig.diff.cytokines <- as.character(subset(divergence.df,pval.1 <= 0.05)$cytokine)
+
+```
+<br/>
+
+### Time course of selected cytokines
+```{r time.course,out.width=900,fig.height=5,fig.cap="Figure 3 Time course of selected circulating protein levels of by disease severity. Proteins that either show significant differences (p ≤ 0.05) between the two severity groups or their expression patterns change (p ≤ 0.05) around the critical juncture are shown. Longitudinal samples from the same individual are connected by gray lines. Trajectories were fitted to the two DSM patient groups separately and are shown with the shaded areas representing standard error."}
+selected.cytokine.profiles.avg <- aggregate(test_value ~ subject_id + days_from_symptom_onset_to_test + test_name + test_id + dsm.group,
+                                            selected.cytokine.profiles,mean)
+
+ggplot(subset(selected.cytokine.profiles.avg,test_id %in% c(sig.diff.cytokines)),
+       aes(days_from_symptom_onset_to_test,log10(test_value+1),group=dsm.group)) +
+  #geom_vline(xintercept = 20,color="grey60",linetype="dashed") +
+  geom_rect(aes(xmin=17,xmax=23,ymax=Inf,ymin=-Inf),fill = "#EADCFA", alpha = 0.05) +
+  geom_point(alpha=.25,pch=21,aes(fill=dsm.group),size=1) + scale_fill_manual(name="DSM group",values=c("red","deepskyblue1")) +
+  geom_line(aes(group=subject_id),alpha=0.1) +
+  scale_color_manual(name="DSM group",values=c("red","deepskyblue1")) +
+  geom_smooth(se = T,aes(color=dsm.group),alpha=0.2) + #geom_smooth(se = T,aes(fill=dsm.group),alpha=0.1) + 
+  facet_wrap(~test_name,scales = "free") + theme_bw() + xlim(0,40) +
+  xlab("Days from Symptom Onset") + ylab("Cytokine Level (log10 pg/mL)") 
+```
+<br/>
+
+### CBC cell count time course
+```{r cell.count}
+selected.cbc.profiles <- subset(covid19.lab.results,test_type == "Clinical" & subject_id %in% citeseq.patient.dsm$subject_id)
+selected.cbc.profiles <- selected.cbc.profiles[grep("((T|C|s|\\.)_x10.[36].uL$)|[sCT]_pct$",selected.cbc.profiles$test_id),]
+selected.cbc.profiles <- subset(selected.cbc.profiles,test_id %in% names(which(table(selected.cbc.profiles$test_id) > 100)))
+
+
+# reference range
+cell.counts.range <- unique(selected.cbc.profiles[,c("test_name","test_id","normal_range")])
+cell.counts.range[,c("lower.bound","upper.bound")] <- t(sapply(cell.counts.range$normal_range,function(x){as.numeric(unlist(strsplit(x,"-")))}))
+cell.counts.range <- cbind(aggregate(lower.bound ~ test_id + test_name,cell.counts.range,min),
+                           upper.bound=aggregate(upper.bound ~ test_id + test_name,cell.counts.range,max)[,"upper.bound"])
+
+# remove possible erroneous values
+tolerance <- 10
+to.remove.rows <- c()
+for (i in unique(selected.cbc.profiles$test_id)) {
+  cat(i,"\n")
+  test.values <- subset(selected.cbc.profiles,test_id == i)$test_value
+  median.value <- median(test.values,na.rm = T)
+  range <- quantile(test.values,.75,na.rm = T) - quantile(test.values,.25,na.rm = T)
+  to.remove.rows <- c(to.remove.rows,rownames(subset(selected.cbc.profiles,test_id == i & 
+                                                       (test_value > (median.value + tolerance*range) | 
+                                                       test_value < (median.value - tolerance*range)))))
+}
+#View(selected.cbc.profiles[to.remove.rows,])
+selected.cbc.profiles <- subset(selected.cbc.profiles,!(rownames(selected.cbc.profiles) %in% to.remove.rows))
+
+selected.cbc.profiles.avg <- aggregate(test_value ~ subject_id + days_from_symptom_onset_to_test + test_name + test_id + severity.outcome,
+                                            selected.cbc.profiles,mean)
+selected.cbc.profiles.avg$dsm.group <- citeseq.patient.dsm[selected.cbc.profiles.avg$subject_id,"dsm.group"]
+to.display <- selected.cbc.profiles.avg[grep("_pct$",selected.cbc.profiles.avg$test_id),]
+ggplot(to.display) + 
+geom_hline(data=subset(cell.counts.range,test_id %in% to.display$test_id),aes(yintercept=lower.bound),alpha=1,color="darkseagreen3",linetype="dashed") +   
+  geom_hline(data=subset(cell.counts.range,test_id %in% to.display$test_id),aes(yintercept=upper.bound),alpha=1,color="darkseagreen3",linetype="dashed") +
+  geom_rect(aes(xmin=17,xmax=23,ymax=Inf,ymin=-Inf),alpha=0.05,fill = "#EADCFA") +
+  #geom_vline(xintercept = 20,color="grey60",linetype="dashed") +
+  geom_line(aes(x=days_from_symptom_onset_to_test,y=test_value,group=subject_id),alpha=0.1) + 
+  geom_point(alpha=.1,pch=21,aes(fill=dsm.group,x=days_from_symptom_onset_to_test,y=test_value)) +
+  geom_smooth(se = T,aes(x=days_from_symptom_onset_to_test,y=test_value,group=dsm.group,color=dsm.group),alpha=0.3) + xlim(0,40) +
+  scale_color_manual(name="DSM group",values=c("red","deepskyblue1")) + scale_fill_manual(name="DSM group",values=c("red","deepskyblue1")) +
+    facet_wrap(~test_name,scales = "free",ncol=5,dir = "v") + theme_bw() + ylab("Cell Counts (% of Parent Pop.)") + xlab("Days from Symptom Onset")
+
+to.display <- selected.cbc.profiles.avg[grep("_pct$",selected.cbc.profiles.avg$test_id,invert = T),]
+ggplot(to.display) + 
+  geom_hline(data=subset(cell.counts.range,test_id %in% to.display$test_id),aes(yintercept=lower.bound),alpha=1,color="darkseagreen3",linetype="dashed") +   
+  geom_hline(data=subset(cell.counts.range,test_id %in% to.display$test_id),aes(yintercept=upper.bound),alpha=1,color="darkseagreen3",linetype="dashed") +
+  geom_rect(aes(xmin=17,xmax=23,ymax=Inf,ymin=-Inf),alpha=0.05,fill = "#EADCFA") +
+  #geom_vline(xintercept = 20,color="grey60",linetype="dashed") +
+  geom_line(aes(x=days_from_symptom_onset_to_test,y=test_value,group=subject_id),alpha=0.1) + 
+  geom_point(alpha=.1,pch=21,aes(fill=dsm.group,x=days_from_symptom_onset_to_test,y=test_value)) +
+  geom_smooth(se = T,aes(x=days_from_symptom_onset_to_test,y=test_value,group=dsm.group,color=dsm.group),alpha=0.3) + xlim(0,40) +
+    scale_color_manual(name="DSM group",values=c("red","deepskyblue1")) + scale_fill_manual(name="DSM group",values=c("red","deepskyblue1")) +
+    facet_wrap(~test_id,scales = "free",ncol=5,dir = "v") + theme_bw() + ylab("Cell Counts") + xlab("Days from Symptom Onset")
+```
+
+
+### Session Info
+```{r save}
+save(divergence.df,file=file.path(output.folder,"dsm.high.v.low.cytokine.test.results.RData"))
+
+sessionInfo()
+```

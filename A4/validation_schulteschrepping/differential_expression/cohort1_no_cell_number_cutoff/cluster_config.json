@@ -1,0 +1,10 @@
+{
+    "__default__" :
+    {
+        "mem_free" : "8G",
+        "h_vmem" : "8G",
+        "parallel_opts" : ""
+
+    }
+}
+

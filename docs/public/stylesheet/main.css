@@ -1,0 +1,374 @@
+/* Header and Navbar
+------------------------- */
+
+.nephele-topbar .btn {
+  font-size: 12px;
+  color: #939393;
+}
+
+.nephele-topbar .btn-link:hover,
+.nephele-topbar .btn-link:focus {
+  color: #fff;
+  text-decoration: none;
+  background-color: transparent;
+  outline: 10;
+}
+
+.site-topbar {
+  border: 0;
+  #border-bottom: 1px dotted #d6d7d9;
+}
+
+.site-topbar .btn {
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding-left: 0px;
+  padding-right: 24px;
+  padding-top: 10px;
+  padding-bottom: 6px;
+}
+
+.site-topbar .btn-link:hover,
+.site-topbar .btn-link:focus {
+  text-decoration: none;
+  background-color: transparent;
+  outline: 0;
+  transition: all 0.2s;
+}
+
+.navbar {
+  position: relative;
+  min-height: 40px;
+  margin-bottom: 0px;
+  border: none;
+  border-radius: 0px;
+  background-color: #20558A ; 
+}
+
+
+.nephele-navhr {
+    margin-top: 0px;
+    margin-bottom: 0px;
+    border: 0;
+    border-top: 1px dotted #939393;
+}
+
+.nephele-logotype {
+  font-size: 18px;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #ffffff;  
+
+}
+
+.nephele-tagline {
+  font-size: 12px;
+  opacity: 0.7;
+  color: #fff;
+}
+
+.nbp-links {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #ffffff;
+}
+
+.nbp-links:hover,
+.nbp-links:focus {
+  color: #ffffff;
+  text-decoration: none;
+  background-color: transparent;
+}
+.topBtn {
+  display: none;
+  position: fixed;
+  bottom: 50px;
+  right: 30px;
+  z-index: 99;
+  border: none;
+  outline: none;
+  opacity: 0.7;
+  background-color: red;
+  text-align: center;
+  color: white;
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 50%;
+}
+
+.topBtn:hover {
+  /*background-color: #555;*/
+  opacity: 1;
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+}
+
+/* ------------------------- */
+/* RESPONSIVE CSS
+-------------------------------------------------- */
+@media (min-width: 768px) {
+
+  .navbar-right {
+    float: right!important;
+    margin-right: -15px;
+    padding-top: 29px;
+   }
+
+}
+
+@media (max-width: 780px) {
+  .alingment-center-footer {
+   text-align: center;
+  }
+
+}
+
+@media (max-width: 625px) {
+  
+  .navbar {
+  position: relative;
+  min-height: 130px;
+  margin-bottom: 0px;
+  border: none;
+  border-radius: 0px;
+  background-color: #20558A ; 
+}
+}
+
+@media (max-width: 405px) {
+  .nephele-logotype{
+    font-size: 16px;
+  }
+}
+
+/* Code */
+
+@media (min-width: 768px) {
+  .code-page-content {
+  margin-bottom: 20px;
+ }
+  .main-header{
+  	padding: 20px;
+  }
+}
+.space-header{
+	padding-top: 300px;
+}
+.block-codes {
+    position: relative;
+	min-height: 300px;
+	display: block;
+    padding: 0px;
+    margin-bottom: 20px;
+    line-height: 1.42857143;
+    background-color: #fff;
+    border: 1;
+    border-radius: 0px;
+    -webkit-transition: border .2s ease-in-out;
+    -o-transition: border .2s ease-in-out;
+    transition: border .2s ease-in-out;
+}
+
+.codes-desc {
+	padding-right: 15px;
+	padding-left: 15px;
+	padding-top: 0px;
+	padding-bottom: 10px;
+	font-size: 12px;
+	line-height: 1.4;
+	margin-top: 0px;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.codes-download {
+	background-color: #159957;
+/*background-image: linear-gradient(120deg, #155799, #159957);*/
+	/*background-color: #00a6d2;*/
+	color: #fff;
+	text-transform: uppercase;
+	/*font-weight: 700;*/
+	border: 0;
+	border-radius: 0px;
+	letter-spacing: 1px;
+	margin-bottom: 20px;
+}
+
+.codes-download:hover {
+	/*background-image: linear-gradient(120deg, #005295, #159957);*/
+	background-color: #005295;
+	color: #fff;
+	text-transform: uppercase;
+	/*font-weight: 700;*/
+	border: 0;
+	border-radius: 0px;
+	letter-spacing: 1px;
+	margin-bottom: 20px;
+}
+
+.codes-title {
+    padding-top: 15px;
+	padding-right: 10px;
+	padding-left: 15px;
+	font-size: 16px;
+	line-height: 1.4;
+}
+
+
+.codes-bottom {
+	position: absolute;
+	bottom: 0px;
+	width: 100%;
+	
+}
+
+.codes-bottom-row {
+	padding-top: 15px;
+	/*border-top: 1px solid red;*/
+}
+
+.data-download {
+	background-color: #f59e42;
+/*background-image: linear-gradient(120deg, #155799, #159957);*/
+	/*background-color: #00a6d2;*/
+	color: #fff;
+	text-transform: uppercase;
+	/*font-weight: 700;*/
+	border: 0;
+	border-radius: 0px;
+	letter-spacing: 1px;
+	margin-bottom: 20px;
+}
+
+.data-download:hover {
+	/*background-image: linear-gradient(120deg, #005295, #159957);*/
+	background-color: #005295;
+	color: #fff;
+	text-transform: uppercase;
+	/*font-weight: 700;*/
+	border: 0;
+	border-radius: 0px;
+	letter-spacing: 1px;
+	margin-bottom: 20px;
+}
+
+/* Icon Forward */
+.hvr-icon-forward {
+  display: inline-block;
+  vertical-align: middle;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -moz-osx-font-smoothing: grayscale;
+  position: relative;
+  padding-right: 2.2em;
+  -webkit-transition-duration: 0.1s;
+  transition-duration: 0.1s;
+}
+.hvr-icon-forward:before {
+  content: "\f178";
+  position: absolute;
+  right: 1em;
+  padding: 0 1px;
+  font-family: FontAwesome;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-transition-duration: 0.1s;
+  transition-duration: 0.1s;
+  -webkit-transition-property: transform;
+  transition-property: transform;
+  -webkit-transition-timing-function: ease-out;
+  transition-timing-function: ease-out;
+}
+.hvr-icon-forward:hover:before, .hvr-icon-forward:focus:before, .hvr-icon-forward:active:before {
+  -webkit-transform: translateX(4px);
+  transform: translateX(4px);
+}
+
+/* Footer */
+
+@media (max-width: 780px) {
+  .alignment-center-footer {
+   text-align: center;
+  }
+}
+
+.main-niaid-footer {
+	background-color: #20558A;
+	margin-top: 0px;
+	padding-bottom: 100px;
+	padding-top: 60px;
+	padding-left: 0px;
+	padding-right: 0px;
+}
+
+.footer-links-heading {
+	font-size: 12px;
+	text-transform: uppercase;
+	color: #fff;
+}
+.footer-links-heading-bio {
+  font-size: 12px;
+  color: #fff;
+}
+
+.footer-links {
+	font-size: 14px;
+	color: #fff;/*5b616b*/
+	line-height: 1.8;
+  opacity: 0.7;
+}
+
+.footer-links:hover,
+.footer-links:focus {
+	font-size: 14px;
+	color: #f1f1f1;/*fff*/
+  opacity: 1;
+	text-decoration: none;
+	/*background-color: transparent;*/
+	transition:.2s linear;
+}
+
+.footer-nih-tagline {
+	font-size: 14px;
+	color: #fff;/*5b616b*/
+}
+
+.footer-address {
+	font-size: 14px;
+	color: #fff;/*5b616b*/
+}
+
+.footer-columns-separator {
+	border-top: 1px solid transparent;
+	margin-top: 30px;
+	margin-bottom: 30px;
+}
+
+.sidebar-column-separator {
+	border-top: 1px solid transparent;
+	margin-top: 30px;
+	margin-bottom: 30px;
+}
+
+.footer-hr {
+  border-top: 1px solid #fff;/*5b616b*/
+}
+
+img.img-hhs-footer{
+  content: url(../images/white-logo-footer/hhs-logo-footer.png); 
+  width: 30px;
+  height: 36px;
+}
+
+img.img-nih-footer{
+  content: url(../images/white-logo-footer/nih-logo-footer.png); 
+  width: 48px;
+  height: 30px;
+}
+img.img-usa-footer{
+  content: url(../images/white-logo-footer/usagov-logo-footer.png); 
+  width: 100px;
+  height: 30.4px;
+}

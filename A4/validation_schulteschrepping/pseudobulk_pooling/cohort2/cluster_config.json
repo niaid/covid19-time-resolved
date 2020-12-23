@@ -1,0 +1,17 @@
+{
+    "__default__" :
+    {
+        "mem_free" : "14G",
+        "h_vmem" : "14G",
+        "parallel_opts" : ""
+
+    },
+    "pseudobulk_pool" :
+    {
+        "mem_free" : "40G",
+        "h_vmem" : "40G",
+        "parallel_opts" : ""
+
+    }
+}
+

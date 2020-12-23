@@ -1,0 +1,233 @@
+---
+title: "Severity Network Construction"
+output: 
+  html_document:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+Identify pathways that are directly associated with COVID disease severity
+```{r setup, include=FALSE}
+data.folder <- "input.data"
+output.folder <- "output/severity.network"
+dir.create(output.folder,recursive = T)
+library(knitr)
+library(ggplot2)
+library(pheatmap)
+library(huge)
+library(network)
+library(ggnetwork)
+knitr::opts_chunk$set(echo = TRUE)
+options(stringsAsFactors = FALSE)
+opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+severity.color <- c("Critical-Alive"="#374E55FF","Critical-Deceased"="#DF8F44FF","Moderate-Alive"="#00A1D5FF" ,"Severe-Alive"="#B24745FF")
+```
+
+### Import Data
+Use GSVA scores from the PC1_module_score_gsva_filtered_samples_genes file, which was created using edge genes of GSEA of PC1 coefficients.
+
+Consider only a subset of pathways that are of interest and passed GSEA p value cutoff of 0.2
+```{r import.data}
+end.point.info <- readRDS(file.path(output.folder,"..","DSM","citeseq.patient.end.points.RDS"))
+# selected gene sets from Fig 3 to analyse
+selected.gene.sets <- read.csv(file.path(data.folder,"pathway_summary.csv"))
+
+# GSEA stats
+# gene sets that are sig. in GSEA (or in manual node list) and are of interest
+gsea.res <- read.csv(file.path(data.folder,"gene.set.scores.and.gsea.csv"))
+gsea.res$cell.type.pathway <- paste0(gsea.res$pathway,"_",gsea.res$celltype)
+sig.gsea.res <- subset(gsea.res,PC1continuous_padj <= 0.2)
+pathway.info <- unique(sig.gsea.res[,-c(11:15)])
+pathway.info <- merge(selected.gene.sets,pathway.info,by.x="Primary_gene_sets",by.y="pathway")
+rownames(pathway.info) <- pathway.info$cell.type.pathway
+
+# gsva module scores
+#module.score.type <- "continuousPC1_module_score_gsva_all_samples"
+module.score.type <- "PC1_PC1_module_score_gsva_filtered_samples_genes"
+gsva.scores <- readRDS(file.path(data.folder,paste0(module.score.type,".rds")))
+gsva.scores$cell.type.pathway <- paste0(gsva.scores$pathway,"_",gsva.scores$celltype)
+# keep only those that are sig. in GSEA
+sig.gsva.scores <- subset(gsva.scores,cell.type.pathway %in% pathway.info$cell.type.pathway)
+sig.gsva.scores[,c("subject_id","visit","batch")] <- do.call("rbind",sapply(as.character(sig.gsva.scores$sample),strsplit,"_"))
+sig.gsva.scores$leadingEdge.size <- sapply(sig.gsva.scores$leadingEdge,function(x){length(unlist(strsplit(x," ")))}) 
+sig.gsva.scores$pct.leadingEdge <- sig.gsva.scores$leadingEdge.size/sig.gsva.scores$size
+
+pathway.info[sig.gsva.scores$cell.type.pathway,c("num.included","leadingEdge.size","pct.leadingEdge","leadingEdge")] <- 
+  sig.gsva.scores[,c("size","leadingEdge.size","pct.leadingEdge","leadingEdge")]
+```
+  
+### Pathway Selection
+Select pathways correlated with DSM (using Spearman correlation)
+```{r network,out.width="800px",fig.height=8}
+sig.gsva.scores <- reshape2::dcast(sig.gsva.scores, subject_id + visit ~ pathway + celltype,value.var = "module.score",fun.aggregate = mean)
+sig.gsva.scores <- sig.gsva.scores[order(sig.gsva.scores$visit),]
+t0.sig.gsva.scores <- sig.gsva.scores[!duplicated(sig.gsva.scores$subject_id),]
+#t0.sig.gsva.scores <- cbind(t0.sig.gsva.scores,end.point.info[t0.sig.gsva.scores$Donor,grep("corrected",colnames(end.point.info))])
+rownames(t0.sig.gsva.scores) <- t0.sig.gsva.scores$subject_id
+t0.sig.gsva.scores <- subset(t0.sig.gsva.scores,visit == "T0")
+t0.sig.gsva.scores <- t0.sig.gsva.scores[,-c(1:2)]
+# remove healthy?
+#t0.sig.gsva.scores <- t0.sig.gsva.scores[grep("^HGR",rownames(t0.sig.gsva.scores)),]
+
+# correlation between PC1 and module scores
+t0.sig.gsva.scores$PC1 <- end.point.info[rownames(t0.sig.gsva.scores),"PC1"]
+t0.sig.gsva.scores <- subset(t0.sig.gsva.scores,!is.na(PC1))
+module.cor.res <- data.frame()
+for (i in setdiff(colnames(t0.sig.gsva.scores),"PC1")) {
+  tmp <- cor.test(t0.sig.gsva.scores[,"PC1"],t0.sig.gsva.scores[,i],method = "spearman")
+  module.cor.res <- rbind(module.cor.res,data.frame(module=i,cor=tmp$estimate,cor.pval=tmp$p.value))
+}
+
+# correlation among modules with sig. correlation to PC1
+sig.modules <- subset(module.cor.res,cor.pval <= 0.05)$module
+cat("Number of modules sig. correlated with PC1:",length(sig.modules),"\n")
+sig.modules <- c(sig.modules,"PC1")
+sig.module.cor <- Hmisc::rcorr(as.matrix(t0.sig.gsva.scores[,sig.modules]),type = "spearman")
+sig.module.cor.pval <- sig.module.cor$P
+sig.module.cor <- sig.module.cor$r
+pheatmap(sig.module.cor,show_rownames = T,show_colnames = F,main="Correlation of PC1-associated gene sets (excluding healthy)",
+         color = viridis::viridis_pal()(101),fontsize = 8,
+         annotation_row = pathway.info[,c("celltype","Category","PC1continuous_NES","PC1discrete_NES")])
+```
+
+### Inverse covariance matrix
+Use the pathways selected in the previous section as input to calculate inverse covariance matrix.
+
+Identify primary nodes, which are direct correlates of PC1, and secondary nodes, which are nodes connecting to primary nodes but not PC1
+```{r icm}
+# inverse covariance matrix method
+inverse.matrix.method = "mb"
+# use variance matrix as input
+huge.transformed.matrix <- var(scale(as.matrix(t0.sig.gsva.scores[,sig.modules])),use = "pairwise.complete.obs")
+#huge.transformed.matrix <- huge.npn(as.matrix(t0.sig.gsva.scores[,sig.modules])) 
+
+lasso.graphs <- huge(huge.transformed.matrix,method=inverse.matrix.method,lambda = seq(1,0,-0.01))
+num.connections <- sapply(lasso.graphs$path,sum)
+names(num.connections) <- lasso.graphs$lambda
+plot(lasso.graphs$lambda,num.connections,type="l",main = paste0(inverse.matrix.method," (without transformation)"),
+     xlab="lambda",ylab="Number of non-zeros in precision matrix")
+#cat("Number of remaining connections with different penalties:\n")
+#print(num.connections)
+# PC1 connections across lambda range
+PC1.connections <- sapply(lasso.graphs$path,function(x){x[colnames(huge.transformed.matrix) == "PC1",]})
+rownames(PC1.connections) <- colnames(huge.transformed.matrix)
+colnames(PC1.connections) <- round(lasso.graphs$lambda,3)
+pheatmap(PC1.connections,show_colnames = T,cluster_cols = F,color = c("white","darkred"),cellwidth = 4,
+         main = paste0("Gene sets connected to PC1 (",inverse.matrix.method," without transformation)"),fontsize = 5)
+
+inverse.matrix.penalty <- 0.35
+sig.module.inverse.cov <- as.matrix(lasso.graphs$path[[which(abs(lasso.graphs$lambda - inverse.matrix.penalty) < 1e-6)]]) # some slight numerical instability
+colnames(sig.module.inverse.cov) <- rownames(sig.module.inverse.cov) <- colnames(huge.transformed.matrix)
+diag(sig.module.inverse.cov) <- 0
+# nodes connected to PC1
+primary.nodes <- names(which(sig.module.inverse.cov["PC1",] == 1))
+# secondary nodes
+secondary.nodes <- rownames(which(sig.module.cor.pval[,primary.nodes] <= 0.05 & sig.module.inverse.cov[,primary.nodes] == 1,arr.ind = T))
+secondary.nodes <- setdiff(unique(secondary.nodes),c("PC1",primary.nodes))
+```
+
+### Create Network
+Draw a simple network connecting PC1/DSM to the adjacent nodes 
+```{r visualize.network,out.width="800px",fig.height=8}
+network.nodes <- c("PC1",primary.nodes,secondary.nodes)
+network.node.cor <- sig.module.cor[network.nodes,network.nodes]
+network.node.cor.pval <- sig.module.cor.pval[rownames(network.node.cor),colnames(network.node.cor)]
+network.node.inverse.cov <- sig.module.inverse.cov[rownames(network.node.cor),colnames(network.node.cor)]
+network.node.cor.pval[is.na(network.node.cor.pval)] <- 1
+
+pathway.info$num.connections <- NA
+pathway.info[rownames(network.node.inverse.cov),]$num.connections <- rowSums(network.node.inverse.cov*(network.node.cor.pval <= 0.05),na.rm = T)
+celltype.connection.counts <- aggregate(network.node.inverse.cov*(network.node.cor.pval <= 0.05),list(pathway.info[rownames(network.node.inverse.cov),"celltype"]),sum)
+pathway.info$num.connections.celltype <- NA
+pathway.info[colnames(celltype.connection.counts)[-1],]$num.connections.celltype <- colSums(celltype.connection.counts[,-1] > 0)
+
+adj.matrix <- network.node.cor
+# simple network for 1st level nodes only
+#adj.matrix <- network.node.cor[unique(c("PC1",primary.nodes)),unique(c("PC1",primary.nodes))]
+# remove connections that don't have sig. correlations
+adj.matrix[network.node.cor.pval[rownames(adj.matrix),colnames(adj.matrix)] > 0.05] <- 0
+cat("Number of connections remaining:",sum(adj.matrix != 0),"\n")
+# remove connections not in inverse covariance matrix
+adj.matrix[network.node.inverse.cov[rownames(adj.matrix),colnames(adj.matrix)] == 0] <- 0
+cat("Number of connections remaining:",sum(adj.matrix != 0),"\n")
+cat("Number of connections remaining:",sum(adj.matrix != 0),"\n")
+# remove orphans
+#adj.matrix <- adj.matrix[rowSums(abs(adj.matrix)) > 0,colSums(abs(adj.matrix)) > 0]
+
+# edge type: 1 - PC1 to primary nodes, 2 - primary to secondary, 3 - same level connections
+edge.type <- matrix(3,nrow=nrow(adj.matrix),ncol=ncol(adj.matrix),dimnames = dimnames(adj.matrix))
+edge.type["PC1",] <- 1
+edge.type[,"PC1"] <- 1
+edge.type[primary.nodes,secondary.nodes] <- 2
+edge.type[secondary.nodes,primary.nodes] <- 2
+
+selected.rep.pathways <- pathway.info[rownames(adj.matrix),]
+selected.rep.pathways$pathway <- rownames(adj.matrix)
+selected.rep.pathways[is.na(selected.rep.pathways$pct.leadingEdge),"pct.leadingEdge"] <- max(selected.rep.pathways$pct.leadingEdge,na.rm = T)
+rownames(selected.rep.pathways) <- selected.rep.pathways$pathway
+# organize by node level then cell type
+selected.rep.pathways$level <- 0
+selected.rep.pathways[primary.nodes,"level"] <- 1
+selected.rep.pathways[secondary.nodes,"level"] <- 2
+selected.rep.pathways <- selected.rep.pathways[order(selected.rep.pathways$level,selected.rep.pathways$celltype),]
+adj.matrix <- adj.matrix[rownames(selected.rep.pathways),rownames(selected.rep.pathways)]
+net <- network(adj.matrix,directed = F)
+network.vertex.names(net) <- rownames(adj.matrix)
+cluster.color <- ggsci::pal_igv()(length(unique(selected.rep.pathways$category)))
+names(cluster.color) <- unique(selected.rep.pathways$category) 
+celltype.color <- c(ggsci::pal_d3()(10),rev(ggsci::pal_tron()(7)))
+celltype.color <- celltype.color[1:length(unique(selected.rep.pathways$celltype))]
+names(celltype.color) <- unique(selected.rep.pathways$celltype)  
+# node attributes
+net %v% "cluster" = as.character(selected.rep.pathways$Category)
+net %v% "celltype" <- as.character(selected.rep.pathways$celltype)
+net %v% "pctLeading" <- selected.rep.pathways$pct.leadingEdge
+# edge attributes
+set.edge.attribute(net,"direction",1)
+set.edge.value(net,"direction",adj.matrix > 0)
+set.edge.attribute(net,"correlation",1)
+set.edge.value(net,"correlation",round(adj.matrix,3))
+set.edge.attribute(net,"corr.pval",1)
+set.edge.value(net,"corr.pval",network.node.cor.pval[rownames(adj.matrix),colnames(adj.matrix)])
+set.edge.attribute(net,"type",1)
+set.edge.value(net,"type",edge.type)
+
+# overlap of leading edge
+network.node.leading.edges <- gsva.scores[match(c(primary.nodes,secondary.nodes),gsva.scores$cell.type.pathway),c("leadingEdge","size","cell.type.pathway")]
+network.node.leading.genes <- sapply(network.node.leading.edges$leadingEdge,strsplit," ")
+names(network.node.leading.genes) <- network.node.leading.edges$cell.type.pathway
+
+network.table <- ggnetwork(net)
+network.table <- cbind(network.table,pathway.info[network.table$vertex.names,c("Primary_gene_sets","num.connections","num.connections.celltype")])
+network.table[is.na(network.table$celltype),c("celltype","Primary_gene_sets")] <- "PC1"
+network.table$selected.leading.genes <- sapply(network.node.leading.genes[network.table$vertex.names],function(x){paste0(x[1:5],collapse="\n")})
+network.table <- merge(network.table,unique(network.table[,-c(7:12)]),by.x=c("xend","yend"),by.y=c("x","y"),all.x=T,suffixes=c("",".end"))
+
+# subset to only PC1 and primary nodes
+display.network <- subset(network.table,vertex.names %in% c("PC1",primary.nodes) & vertex.names.end %in% c("PC1",primary.nodes))
+ggplot(display.network,aes(x=x,y=y,xend=xend,yend=yend)) + #,layout="circle") + 
+  geom_edges(data=subset(display.network,type==3),aes(linetype=direction,size=-log10(corr.pval)/100,color=as.factor(type)),curvature = 0.2,alpha=.75) + 
+  geom_edges(data=subset(display.network,type==1),aes(linetype=direction,size=-log10(corr.pval)/100,color=as.factor(type)),curvature = 0.1,alpha=.75) + 
+  geom_nodes(pch=21,color="black",fill="white",size=15) + # background
+  geom_nodes(aes(fill=celltype,size=pctLeading),pch=21,color="black") + #,size=10) + 
+  geom_nodetext_repel(aes(label=Primary_gene_sets),size=2,force=2,fontface="bold",segment.size = 0,nudge_y = -0.07) + 
+  geom_nodetext_repel(aes(label=selected.leading.genes),size=2,force=2,nudge_y = 0.1,nudge_x = 0.1) +
+  geom_edgetext(aes(label=correlation,color=direction),size=4) + 
+  theme_blank() + scale_fill_manual(values=c("orange","lightblue","darkgreen")) + 
+  scale_color_manual(values=c("1"="grey30","2"="deepskyblue3","3"="grey90","TRUE"="tomato","FALSE"="deepskyblue2")) + 
+  scale_alpha(range=c(0.3,1)) + scale_size(range = c(5,10)) +#scale_size(range = c(2,6)) +
+  scale_linetype_manual(values=c("dashed","solid")) + guides(color=F,linetype=F) + theme(plot.margin = unit(c(1,1,1,1),"inch"))
+
+```
+
+### Session Info
+```{r save}
+# save network
+tmp <- subset(network.table,!is.na(correlation))
+tmp <- tmp[order(tmp$type,tmp$celltype.end,tmp$vertex.names.end,tmp$celltype),]
+write.csv(tmp,file.path(output.folder,"network.table.csv"),row.names=F)
+
+sessionInfo()
+```

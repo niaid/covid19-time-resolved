@@ -1,0 +1,6 @@
+#!/usr/bin/bash
+
+module load snakemake/5.8.2-Python-3.6.7
+source /nethome/rachmaninoffn2/.moduleload/R3.6.0_v2
+
+snakemake -j 200 --cluster-config cluster_config.json --cluster "qsub -terse -l quick,avx2,mem_free={cluster.mem_free},h_vmem={cluster.h_vmem} {cluster.parallel_opts}" -s Snakefile_t0_covid.py --keep-going -F

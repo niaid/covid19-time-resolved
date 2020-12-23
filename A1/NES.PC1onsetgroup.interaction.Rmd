@@ -1,0 +1,86 @@
+---
+title: "Effect size (NES) of early (TSO < d17) and mid (TSO d17-23) time periods plot"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(openxlsx)
+library(reshape2)
+library(ggrepel)
+```
+
+## Effect size (NES) of early (TSO < d17) and mid (TSO d17-23) time periods
+**Generate Figure 6C**  
+
+read in enrichment results tables and filter selected pathways for each celltype
+Enrichment results from PC1/DSM and days_since_onset group interaction model reflecting the difference of DSM high and low group in early and mid time periods  
+
+```{r input}
+FGSEA_IN_PATH_EARLY <- "input/differential_expression/fgsea_tables/PC1High-low_in_early"
+FGSEA_IN_PATH_MID <- "input/differential_expression/fgsea_tables/PC1High-low_in_mid"
+remove_celltype_early <- paste(FGSEA_IN_PATH_EARLY, c("/Dblt", "/DPT", "/gated_out", "/PB_Plasmablasts", "/TissueResMemT", "/Unknown", "/Granulocytes"), "--model@PC1_onset_group_interaction--coef@PC1High-low_in_early--fgsea.tsv", sep = "")
+remove_celltype_mid <- paste(FGSEA_IN_PATH_MID, c("/Dblt", "/DPT", "/gated_out", "/PB_Plasmablasts", "/TissueResMemT", "/Unknown", "/Granulocytes"), "--model@PC1_onset_group_interaction--coef@PC1High-low_in_mid--fgsea.tsv", sep = "")
+
+files_early <- list.files(FGSEA_IN_PATH_EARLY, full.names = TRUE)
+files_early <- files_early[-which(files_early %in% remove_celltype_early)]
+files_mid <- list.files(FGSEA_IN_PATH_MID, full.names = TRUE)
+files_mid <- files_mid[-which(files_mid %in% remove_celltype_mid)]
+
+fgsea_list_early <- lapply(files_early, function(x) read.delim(x, header = TRUE, sep = "\t"))
+names(fgsea_list_early) <- gsub("--model@PC1_onset_group_interaction--coef@PC1High-low_in_early--fgsea\\.tsv", "", basename(files_early))
+fgsea_list_mid <- lapply(files_mid, function(x) read.delim(x, header = TRUE, sep = "\t"))
+names(fgsea_list_mid) <- gsub("--model@PC1_onset_group_interaction--coef@PC1High-low_in_mid--fgsea\\.tsv", "", basename(files_mid))
+
+# read in selected pathways
+pathways <- read.xlsx("input/selected_pathway_summary.xlsx", sheet = "reduced", startRow = 1)
+fgsea_list_early_selected <- lapply(fgsea_list_early, function(x) {filter(x, pathway %in% pathways$Primary_gene_sets)})
+fgsea_list_mid_selected <- lapply(fgsea_list_mid, function(x) {filter(x, pathway %in% pathways$Primary_gene_sets)})
+
+fgsea_list_selected <- list()
+for (i in names(fgsea_list_early_selected)) {
+  fgsea_list_selected[[i]] <- bind_rows(fgsea_list_early_selected[[i]], fgsea_list_mid_selected[[i]], .id = "TSO_group")
+}
+
+fgsea_selected_df <- bind_rows(fgsea_list_selected, .id = "celltype")
+
+fgsea_selected_df$TSO_group <- replace(fgsea_selected_df$TSO_group, fgsea_selected_df$TSO_group == "1", "TSO < d17")
+fgsea_selected_df$TSO_group <- replace(fgsea_selected_df$TSO_group, fgsea_selected_df$TSO_group == "2", "TSO d17-d23")
+fgsea_selected_df$direction <- ifelse(fgsea_selected_df$NES>0, "up", "dn")
+```
+  
+  
+### plot NES
+```{r, fig.width=7, fig.height=4}
+fgsea_selected_df_NK_mono <- filter(fgsea_selected_df, celltype %in% c("NK_CD16hi","Mono_Classical"))
+
+# selected genesets bar graph
+fgsea_selected_df_NES_inflam <- filter(fgsea_selected_df_NK_mono, 
+                                       pathway %in% c("HALLMARK_INFLAMMATORY_RESPONSE",
+                                                      "HALLMARK_TNFA_SIGNALING_VIA_NFKB",
+                                                      "reactome_Fatty acid metabolism",
+                                                      "KEGG_OXIDATIVE_PHOSPHORYLATION"))
+fgsea_selected_df_NES_inflam$direction = factor(fgsea_selected_df_NES_inflam$direction, levels = c("up","dn"))
+fgsea_selected_df_NES_inflam$TSO_group = factor(fgsea_selected_df_NES_inflam$TSO_group, levels = c("TSO d17-d23","TSO < d17"))
+p <- ggplot(fgsea_selected_df_NES_inflam, aes(x = celltype, y = NES, fill = TSO_group, group = TSO_group)) +
+  geom_bar(stat = "identity", position = "dodge", alpha=0.7) +
+  coord_flip()+
+  scale_fill_manual(name="TSO_group", values = c("#bcace5","#4bc26c"))+
+  facet_wrap(~pathway, scales = "free_x") +
+  geom_vline(xintercept = 0)+
+  theme_bw()
+
+p
+# ggsave(filename = "output/mono_NK_TSOgroup_NES.pdf", plot = p, device = "pdf", height = 4, width = 7)
+
+```
+
+
+```{r}
+sI <- sessionInfo()
+utils:::print.sessionInfo(sI[-c(10,11)])
+```
+
+

@@ -1,0 +1,329 @@
+---
+title: "Cytokine Profiles for Brescia Deceased vs. Recovered"
+output: 
+  html_document:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+Compare cytokine profiles between deceased patients and those with good outcome. Specific focus on 17-23 days since symptom onset.
+```{r setup, include=FALSE}
+data.folder <- "input.data"
+output.folder <- "output/critical.juncture"
+dir.create(output.folder,recursive = T)
+library(knitr)
+library(ggplot2)
+library(ggsci)
+library(ggpubr)
+library(ggfortify)
+library(mgcv)
+library(tidymv)
+library(lme4)
+library(lmerTest)
+library(plsRglm)
+library(precrec)
+knitr::opts_chunk$set(echo = TRUE)
+options(stringsAsFactors = FALSE)
+opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+
+source("critical.juncture/juncture.protein.search.R")
+
+```
+
+### Create sub-cohort
+Identify all deceased patients and match them with critical but recovered patients by age and gender (excluding those staying hospitalized for more than 50 days).
+Patients in the citiseq cohort can optionally be excluded.
+```{r read.data}
+load(file.path(data.folder,"covid19.metadata.paper1.RData"),verbose=F)
+covid19.lab.results$severity.outcome <- paste0(covid19.lab.results$severity,"-",covid19.lab.results$outcome)
+
+severity.color <- c("Critical-Alive"="#374E55FF","Critical-Deceased"="#DF8F44FF","Moderate-Alive"="#00A1D5FF" ,"Severe-Alive"="#B24745FF","HC" = "#79AF97FF")
+
+deceased.patients.cytokines <- subset(covid19.lab.results,outcome == "Deceased" & test_type == "ELISA" & !is.na(days_from_symptom_onset_to_test))
+deceased.patients <- unique(deceased.patients.cytokines$subject_id)
+
+cat("Map of sampling TSO time points for deceased patients:\n")
+deceased.time.points <- as.data.frame.matrix(table(deceased.patients.cytokines[,c("subject_id","days_from_symptom_onset_to_test")])) 
+colSums(deceased.time.points > 0)
+cat("Age and sex distribution:\n")
+table(subset(covid19.patient.demo,subject_id %in% deceased.patients)$sex)
+summary(subset(covid19.patient.demo,subject_id %in% deceased.patients)$age)
+
+# recovered patients with similar age and sex
+age.tol <- 3
+recovered.patients <- c()
+for (i in deceased.patients) {
+  target.age <- covid19.patient.demo[i,"age"]
+  target.sex <- covid19.patient.demo[i,"sex"]
+  cat("Target age:",target.age,"sex:",target.sex,"\n")
+  tmp <- subset(covid19.lab.results,outcome != "Deceased" & test_type == "ELISA" & !is.na(days_from_symptom_onset_to_test) & 
+           age >= target.age - age.tol & age <= target.age + age.tol & severity == "Critical" & sex == target.sex & 
+             days_from_symptom_onset_to_test > 15 & days_from_symptom_onset_to_test <= 25 &
+           number_of_days_hospitalized < 50)
+
+  matched.subject <- unique(tmp$subject_id)
+  cat("Matched subject:",matched.subject,"\n")
+  recovered.patients <- c(recovered.patients,matched.subject)
+}
+recovered.patients <- unique(recovered.patients[!is.na(recovered.patients)])
+recovered.patients.cytokines <- subset(covid19.lab.results,test_type == "ELISA" & subject_id %in% recovered.patients)
+cat("Map of samping TSO time points for recovered patients:\n")
+recovered.time.points <- as.data.frame.matrix(table(recovered.patients.cytokines[,c("subject_id","days_from_symptom_onset_to_test")])) 
+colSums(recovered.time.points > 0)
+cat("Age and sex distribution:\n")
+table(subset(covid19.patient.demo,subject_id %in% recovered.patients)$sex)
+summary(subset(covid19.patient.demo,subject_id %in% recovered.patients)$age)
+
+selected.cytokine.profiles <- rbind(deceased.patients.cytokines,recovered.patients.cytokines)
+# remove patients in citeseq
+#citeseq.patients <- subset(covid19.samples,!is.na(batch))$subject_id
+#intersect(citeseq.patients,c(recovered.patients,deceased.patients))
+#selected.cytokine.profiles <- subset(selected.cytokine.profiles,!(subject_id %in% citeseq.patients)) 
+parameter.labels <- unique(selected.cytokine.profiles[,c("test_id","test_name")])
+rownames(parameter.labels) <- parameter.labels$test_id
+parameter.labels$test_name <- gsub("/ ","/",parameter.labels$test_name,fixed = T)
+```
+
+
+### Grouping of samples
+Separate samples into interval groups relative to juncture: early (7-16 days), mid (juncture/17-23 days), and late (24-30 days)
+```{r build}
+selected.cytokine.profiles$unique.id <- make.unique(apply(selected.cytokine.profiles[,c("subject_id","days_from_admission_to_test","test_id")],1,
+                                                          paste0,collapse="."),sep = "|")
+selected.cytokine.profiles$unique.id <- sapply(selected.cytokine.profiles$unique.id,function(x){unlist(strsplit(x,"|",fixed=T))[2]})
+selected.cytokine.profiles.matrix <- reshape2::dcast(selected.cytokine.profiles,
+                                                     subject_id + age + sex + outcome + severity + days_from_symptom_onset_to_test + unique.id ~ test_id,
+                                                     value.var = "test_value")
+selected.cytokine.profiles.matrix[,colnames(selected.cytokine.profiles.matrix) %in% selected.cytokine.profiles$test_id] <-
+  apply(selected.cytokine.profiles.matrix[,colnames(selected.cytokine.profiles.matrix) %in% selected.cytokine.profiles$test_id],2,function(x){scale(log10(x+1))})
+selected.cytokine.profiles.matrix$stage <- NA
+tmp <- which(selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test >= 7 & selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test <= 16)
+selected.cytokine.profiles.matrix[tmp,"stage"] <- "early"
+tmp <- which(selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test >= 17 & selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test <= 23)
+selected.cytokine.profiles.matrix[tmp,"stage"] <- "mid"
+tmp <- which(selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test >= 24 & selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test <= 30)
+selected.cytokine.profiles.matrix[tmp,"stage"] <- "late"
+
+cat("Sample distribution:\n")
+table(selected.cytokine.profiles.matrix[,c("outcome","stage")])
+```
+<br/>
+    
+#### Protein Search 
+Search for divergent proteins around juncture using these two models:
+
+Differential expression: 
+test_value ~ outcome + age.numeric + sex + DFSO + (1|subject_id), for samples within each stage to identify cytokines
+with sig. differences between the two outcome groups
+
+Change between intervals: 
+test_value ~ outcome*stage + age.numeric + sex + DFSO + (1|subject_id), the outcome:stage term captures difference
+in differences between the two groups entering the juncture and post-juncture
+```{r search,out.width=500,fig.height=4}
+search.results <- juncture.divergent.proteins(selected.cytokine.profiles.matrix,pval.cutoff = 1)
+parameter.labels <- unique(selected.cytokine.profiles[,c("test_id","test_name")])
+rownames(parameter.labels) <- parameter.labels$test_id
+parameter.labels$test_name <- gsub("/ ","/",parameter.labels$test_name,fixed = T)
+search.results$type1$cytokine.label <- parameter.labels[search.results$type1$cytokine,"test_name"]
+search.results$type1$de.coef.outcomeDeceased.diff.from.early <- search.results$type1$de.coef.outcomeDeceased - 
+                                                                      search.results$type1$de.coef.outcomeDeceased.early
+search.results$type1$de.coef.outcomeDeceased.inferred <- search.results$type1$did.coef.outcomeDeceased + 
+  search.results$type1$did.coef.test.intervalTRUE.outcomeDeceased
+
+
+# bubble plots of DE and change effects
+#pdf(file.path(output.folder,"critical.juncture","deceased.v.recovered.sig.de.and.change.cytokines.pdf"),width=3,height = 3)
+
+# correlation between different models
+mid.did.de.df <- subset(search.results$type1,stage == "mid")
+ggplot(mid.did.de.df,aes(did.coef.outcomeDeceased,de.coef.outcomeDeceased.early,label=cytokine.label)) + 
+  geom_point(alpha=0.5) + ggrepel::geom_text_repel(data=subset(mid.did.de.df,cytokine.label %in% c("Reg3A","CD25/IL-2R alpha")),size=3) +
+  stat_cor() + geom_abline(intercept = 0,slope = 1, color="red", linetype = "dashed") +
+  theme_bw()  + labs(title="Pre Juncture",x="Mid v. Early Delta Model ES",y="Early DE Model ES")
+ggplot(mid.did.de.df,aes(de.coef.outcomeDeceased.inferred,de.coef.outcomeDeceased,label=cytokine.label)) + 
+  geom_point(alpha=0.5) + ggrepel::geom_text_repel(data=subset(mid.did.de.df,cytokine.label %in% c("Reg3A","CD25/IL-2R alpha")),size=3) +
+  stat_cor() + geom_abline(intercept = 0,slope = 1, color="red", linetype = "dashed") +
+  theme_bw()  + labs(title="Juncture",x="Mid v. Early Delta Model ES",y="Mid DE Model ES")
+
+sig.mid.did.de.df <- subset(mid.did.de.df,de.pval.1 <= 0.05 & did.pval.test.intervalTRUE.outcomeDeceased <= 0.05) # DE in mid & sig. delta 
+# order the cytokine by delta ES
+sig.mid.did.de.df$cytokine.label <- factor(sig.mid.did.de.df$cytokine.label,
+                                           levels=sig.mid.did.de.df$cytokine.label[order(sig.mid.did.de.df$de.coef.outcomeDeceased.diff.from.early)])
+ggplot(sig.mid.did.de.df,aes(cytokine.label,de.coef.outcomeDeceased.early)) + 
+  geom_hline(yintercept = 0,linetype="dashed") +
+  geom_point(aes(size=-log10(de.pval.1.early),color=de.pval.1.early<=0.05,fill="#4bc26c"),alpha=0.75,pch=21) +
+  geom_point(aes(y=de.coef.outcomeDeceased,size=-log10(de.pval.1),color=de.pval.1<=0.05,fill="#EADCFA"),alpha=0.75,pch=21) +
+  coord_flip() + ylab("Effect Size for Deceased Group") + xlab("Cytokine") + 
+  scale_color_manual(name="Sig. P-Value",values=c("white","black")) + scale_fill_manual(name="Stage",labels=c("early","mid"),values=c("#4bc26c","#EADCFA")) +
+  scale_size(name="-log10(p-val)",range = c(2,5)) + theme_bw() + theme(text = element_text(size=8),legend.position = "bottom",legend.direction = "vertical")
+
+# early vs. late
+late.did.de.df <- subset(search.results$type1,stage == "late")
+# correlation between different models
+ggplot(late.did.de.df,aes(did.coef.outcomeDeceased,de.coef.outcomeDeceased.early,label=cytokine.label)) + 
+  geom_point(alpha=0.5) + ggrepel::geom_text_repel(data=subset(late.did.de.df,cytokine.label %in% c("Reg3A","CD25/IL-2R alpha")),size=3) +  
+  stat_cor() + geom_abline(intercept = 0,slope = 1, color="red", linetype = "dashed") +
+  theme_bw()  + labs(title="Pre-juncture",x="Late v. Early Delta Model ES",y="Early DE Model ES")
+ggplot(late.did.de.df,aes(de.coef.outcomeDeceased.inferred,de.coef.outcomeDeceased,label=cytokine.label)) + 
+  geom_point(alpha=0.5) + ggrepel::geom_text_repel(data=subset(mid.did.de.df,cytokine.label %in% c("Reg3A","CD25/IL-2R alpha")),size=3) +
+  stat_cor() + geom_abline(intercept = 0,slope = 1, color="red", linetype = "dashed") +
+  theme_bw()  + labs(title="Post-juncture",x="Late v. Early Delta Model ES",y="Late DE Model ES")
+
+sig.late.did.de.df <- subset(late.did.de.df,de.pval.1 <= 0.05 & did.pval.test.intervalTRUE.outcomeDeceased <= 0.05) # DE in mid & sig. delta
+sig.late.did.de.df$cytokine.label <- factor(sig.late.did.de.df$cytokine.label,
+                                        levels=sig.late.did.de.df$cytokine.label[order(sig.late.did.de.df$de.coef.outcomeDeceased.diff.from.early)])
+ggplot(sig.late.did.de.df,aes(cytokine.label,de.coef.outcomeDeceased.early)) + 
+  geom_hline(yintercept = 0,linetype="dashed") +
+  geom_point(aes(size=-log10(de.pval.1.early),color=de.pval.1.early<=0.05,fill="#4bc26c"),alpha=0.75,pch=21) +
+  geom_point(aes(y=de.coef.outcomeDeceased,size=-log10(de.pval.1),color=de.pval.1<=0.05,fill="lightblue"),alpha=0.75,pch=21) +
+  coord_flip() + ylab("Effect Size for Deceased Group") + xlab("Cytokine") + 
+  scale_color_manual(name="Sig. P-Value",values=c("white","black")) + scale_fill_manual(name="Stage",labels=c("early","late"),values=c("#4bc26c","lightblue")) +
+  scale_size(name="-log10(p-val)",range = c(2,5)) + theme_bw() + theme(text = element_text(size=8),legend.position = "bottom",legend.direction = "vertical")
+#dev.off()
+
+# delta of delta p-value plot
+#pdf(file.path(output.folder,"critical.juncture","deceased.v.recovered.sig.de.and.change.cytokines.delta.pval.pdf"),width=1.75,height = 1.85)
+# early vs. mid
+ggplot(sig.mid.did.de.df,aes(cytokine.label,-log10(did.pval.test.intervalTRUE.outcomeDeceased))) +
+  geom_hline(yintercept = -log10(0.05),linetype = "dashed",color="red") + 
+  geom_bar(stat="identity",fill="deepskyblue4",alpha=0.75) + 
+  scale_y_continuous(breaks = c(0,1,2)) + 
+  coord_flip() + ylab("-log10(p-value)") + xlab("Cytokine") + 
+  #labs(title="Deceased v. Recovered",subtitle = "At early (7-16 days) and mid (17-23 days) stages") +
+  scale_color_manual(name="Sig. P-Value",values=c("white","black")) + scale_fill_manual(name="Stage",values=c("#4bc26c","#EADCFA","lightblue")) +
+  scale_size(name="-log10(p-val)",range = c(2,5)) + theme_classic2() + theme(text = element_text(size=8),legend.position = "bottom",legend.direction = "vertical")
+ggplot(sig.late.did.de.df,aes(cytokine.label,-log10(did.pval.test.intervalTRUE.outcomeDeceased))) +
+  geom_hline(yintercept = -log10(0.05),linetype = "dashed",color="red") + 
+  geom_bar(stat="identity",fill="deepskyblue4",alpha=0.75) + 
+  scale_y_continuous(breaks = c(0,1,2)) + 
+  coord_flip() + ylab("-log10(p-value)") + xlab("Cytokine") + 
+  #labs(title="Deceased v. Recovered",subtitle = "At early (7-16 days) and mid (17-23 days) stages") +
+  scale_color_manual(name="Sig. P-Value",values=c("white","black")) + scale_fill_manual(name="Stage",values=c("#4bc26c","#EADCFA","lightblue")) +
+  scale_size(name="-log10(p-val)",range = c(2,5)) + theme_classic2() + theme(text = element_text(size=8),legend.position = "bottom",legend.direction = "vertical")
+#dev.off()
+bin1.cytokines <- list("mid"=sig.mid.did.de.df$cytokine,"late"=sig.late.did.de.df$cytokine)
+```
+
+```{r correlation,out.width=800,fig.cap="<b>Fig</b> Correlation between outcome and severity comparisons."}
+# Correlation with DSM-high and low DE cytokines
+dsm.envir <- new.env()
+load(file.path(output.folder,"dsm.high.v.low.cytokine.test.results.RData"),verbose = F,envir = dsm.envir)
+merged.de.df <- merge(mid.did.de.df[,c("cytokine","cytokine.label","de.coef.outcomeDeceased","de.pval.1")],
+                      dsm.envir$divergence.df,by="cytokine",suffixes = c(".deceased.v.recovered","dsm.low.v.high"))
+merged.de.df$combined.sig <- paste0(merged.de.df$de.pval.1 <= 0.05,"-",merged.de.df$pval.1 <= 0.05)
+ggplot(merged.de.df,aes(de.coef.outcomeDeceased,-coef.dsm.groupDSM.low,label=cytokine.label.deceased.v.recovered)) + 
+  geom_point(alpha=0.75,pch=21,size=1,aes(fill=combined.sig)) +
+  ggrepel::geom_text_repel(size=1.5,force=3) + geom_hline(yintercept = 0) + geom_vline(xintercept = 0) + 
+  theme_bw() + xlab("Deceased vs. Recovered") + ylab("DSM High vs. Low") + scale_fill_uchicago(name="Sig p-value in outcome/severity ")
+
+cat("Concordance of DE results:\n")
+cont.table <- data.frame(outcome=sign(merged.de.df$de.coef.outcomeDeceased),severity=-sign(merged.de.df$coef.dsm.groupDSM.low))
+table(cont.table)
+fisher.test(table(cont.table))
+```
+
+### Time course of selected cytokines
+```{r time.course,out.width=900,fig.height=5,fig.cap=c("<b>Fig</b> Time course of selected circulating protein levels of critical ill patients with recovery or deceased outcomes. Longitudinal samples from the same individual are connected by gray lines. Trajectories were fitted to the two age- and gender-matched recovered versus deceased patient groups separately and are shown with the shaded areas representing standard error.")}
+display.cytokine.groups <- unique(unlist(bin1.cytokines))
+
+display.cytokine.profiles <- subset(selected.cytokine.profiles,test_id %in% display.cytokine.groups)
+#display.cytokine.profiles$test_name <- factor(display.cytokine.profiles$test_name,levels=unlist(display.cytokine.groups)) 
+
+display.cytokine.profiles.avg <- aggregate(test_value ~ subject_id + days_from_symptom_onset_to_test + test_name + test_id + outcome,
+                                            display.cytokine.profiles,mean)
+subjects_with_early_tp <- unique(subset(display.cytokine.profiles.avg,days_from_symptom_onset_to_test <= 23)$subject_id)
+ggplot(display.cytokine.profiles.avg,aes(days_from_symptom_onset_to_test,log10(test_value+1),group=outcome)) + 
+  #geom_vline(xintercept = 20,color="grey60",linetype="dashed") +
+  geom_rect(aes(xmin=17,xmax=23,ymax=Inf,ymin=-Inf),alpha=0.05,fill = "#EADCFA") +
+  geom_point(alpha=.25,pch=21,aes(fill=outcome),size=.5) + 
+  geom_smooth(se = T,aes(color=outcome,fill=outcome),alpha=0.15,size=.8) + #,data = subset(display.cytokine.profiles.avg,subject_id %in% subjects_with_early_tp)) + 
+  geom_line(aes(group=subject_id),alpha=0.1) +
+  scale_color_manual(name="Outcome",values=c("#374E55FF","#DF8F44FF")) + scale_fill_manual(name="Outcome",values=c("#374E55FF","#DF8F44FF")) +
+  facet_wrap(~test_name,scales = "free",ncol=5,dir = "v") + theme_bw() + xlim(0,60) + 
+  xlab("Days from Symptom Onset") + ylab("Cytokine Level (log10 pg/mL)") + 
+  theme(strip.background = element_rect(fill="white"),strip.text = element_text(size=7))
+```
+<br/>
+
+### Serology time course differences
+SARS-Covid2 Spike and nucleocapsid antibodies
+```{r serology,out.width=600,fig.height=3,fig.cap="<b>Fig</b> Antibody time course for deceased and recovered patients."}
+selected.sero.profiles <- subset(covid19.lab.results,test_type == "Serology" & subject_id %in% selected.cytokine.profiles$subject_id)
+selected.sero.profiles$test_value <- log10(selected.sero.profiles$test_value+1)
+
+ggplot(selected.sero.profiles,aes(days_from_symptom_onset_to_test,test_value)) +
+  geom_vline(xintercept = 20,color="grey60",linetype="dashed") +
+  geom_point(alpha=.25,pch=21,aes(fill=outcome),size=1) + 
+  facet_wrap(~test_name,scales = "free",ncol = 2) + theme_bw() + 
+  geom_smooth(se = T,aes(color=outcome,fill=outcome),alpha=0.15,size=1.25) + 
+  geom_line(aes(group=subject_id),alpha=0.1) +
+  scale_fill_manual(name="Outcome",values=c("#374E55FF","#DF8F44FF")) + 
+  scale_color_manual(name="Outcome",values=c("#374E55FF","#DF8F44FF")) + 
+  ylab("Antibody Level (log10 LU)") + xlab("Days from Symptom Onset") 
+```
+
+### CBC cell count time course
+```{r cell.count,out.width=900,fig.height=3,fig.cap=c("<b>Fig</b> Cell populations as % parent for deceased and recovered patients.","<b>Fig</b> Absolute cell counts for deceased and recovered patients.")}
+selected.cbc.profiles <- subset(covid19.lab.results,test_type == "Clinical" & subject_id %in% c(recovered.patients,deceased.patients))
+selected.cbc.profiles <- selected.cbc.profiles[grep("((T|C|s|\\.)_x10.[36].uL$)|[sCT]_pct$",selected.cbc.profiles$test_id),]
+selected.cbc.profiles <- subset(selected.cbc.profiles,test_id %in% names(which(table(selected.cbc.profiles$test_id) > 100)))
+
+# reference range
+cell.counts.range <- unique(selected.cbc.profiles[,c("test_name","test_id","normal_range")])
+cell.counts.range[,c("lower.bound","upper.bound")] <- t(sapply(cell.counts.range$normal_range,function(x){as.numeric(unlist(strsplit(x,"-")))}))
+cell.counts.range <- cbind(aggregate(lower.bound ~ test_id + test_name,cell.counts.range,min),
+                           upper.bound=aggregate(upper.bound ~ test_id + test_name,cell.counts.range,max)[,"upper.bound"])
+
+# remove possible erroneous values
+tolerance <- 10
+to.remove.rows <- c()
+for (i in unique(selected.cbc.profiles$test_id)) {
+  cat(i,"\n")
+  test.values <- subset(selected.cbc.profiles,test_id == i)$test_value
+  median.value <- median(test.values,na.rm = T)
+  range <- quantile(test.values,.75,na.rm = T) - quantile(test.values,.25,na.rm = T)
+  to.remove.rows <- c(to.remove.rows,rownames(subset(selected.cbc.profiles,test_id == i & 
+                                                       (test_value > (median.value + tolerance*range) | 
+                                                       test_value < (median.value - tolerance*range)))))
+}
+#View(selected.cbc.profiles[to.remove.rows,])
+selected.cbc.profiles <- subset(selected.cbc.profiles,!(rownames(selected.cbc.profiles) %in% to.remove.rows))
+
+selected.cbc.profiles.avg <- aggregate(test_value ~ subject_id + days_from_symptom_onset_to_test + test_name + test_id + severity.outcome,
+                                            selected.cbc.profiles,mean)
+to.display <- selected.cbc.profiles.avg[grep("_pct$",selected.cbc.profiles.avg$test_id),]
+ggplot(to.display) + 
+  geom_hline(data=subset(cell.counts.range,test_id %in% to.display$test_id),aes(yintercept=lower.bound),alpha=1,color="darkseagreen3",linetype="dashed") +   
+  geom_hline(data=subset(cell.counts.range,test_id %in% to.display$test_id),aes(yintercept=upper.bound),alpha=1,color="darkseagreen3",linetype="dashed") +
+  geom_rect(aes(xmin=17,xmax=23,ymax=Inf,ymin=-Inf),alpha=0.05,fill = "#EADCFA") +
+  #geom_vline(xintercept = 20,color="grey60",linetype="dashed") +
+  geom_line(aes(x=days_from_symptom_onset_to_test,y=test_value,group=subject_id),alpha=0.1) + 
+  geom_point(alpha=.1,pch=21,aes(fill=severity.outcome,x=days_from_symptom_onset_to_test,y=test_value)) +
+  geom_smooth(se = T,aes(x=days_from_symptom_onset_to_test,y=test_value,group=severity.outcome,color=severity.outcome),alpha=0.3) + xlim(0,40) +
+  scale_color_manual(name="Severity-Outcome",values=severity.color) + scale_fill_manual(name="Severity-Outcome",values=severity.color) +
+    facet_wrap(~test_name,scales = "free",ncol=5,dir = "v") + theme_bw() + ylab("Cell Counts (% of Parent Pop.)") + xlab("Days from Symptom Onset") +
+    theme(strip.background = element_rect(fill="white"),strip.text = element_text(size=7))
+
+to.display <- selected.cbc.profiles.avg[grep("_pct$",selected.cbc.profiles.avg$test_id,invert = T),]
+ggplot(to.display) + 
+ geom_hline(data=subset(cell.counts.range,test_id %in% to.display$test_id),aes(yintercept=lower.bound),alpha=1,color="darkseagreen3",linetype="dashed") +   
+  geom_hline(data=subset(cell.counts.range,test_id %in% to.display$test_id),aes(yintercept=upper.bound),alpha=1,color="darkseagreen3",linetype="dashed") +
+  geom_rect(aes(xmin=17,xmax=23,ymax=Inf,ymin=-Inf),alpha=0.05,fill = "#EADCFA") +
+  #geom_vline(xintercept = 20,color="grey60",linetype="dashed") +
+  geom_line(aes(x=days_from_symptom_onset_to_test,y=test_value,group=subject_id),alpha=0.1) + 
+  geom_point(alpha=.1,pch=21,aes(fill=severity.outcome,x=days_from_symptom_onset_to_test,y=test_value)) +
+  geom_smooth(se = T,aes(x=days_from_symptom_onset_to_test,y=test_value,group=severity.outcome,color=severity.outcome),alpha=0.3) + xlim(0,40) +
+  scale_color_manual(name="Severity-Outcome",values=severity.color) + scale_fill_manual(name="Severity-Outcome",values=severity.color) +
+    facet_wrap(~test_id,scales = "free",ncol=5,dir = "v") + theme_bw() + ylab("Cell Counts") + xlab("Days from Symptom Onset") + 
+    theme(strip.background = element_rect(fill="white"),strip.text = element_text(size=7))
+```
+
+### Session Info
+```{r save}
+# save all results
+save(merged.de.df,mid.did.de.df,late.did.de.df,file = file.path(output.folder,"deceased.v.recovered.cytokine.test.results.RData"))
+
+sessionInfo()
+```

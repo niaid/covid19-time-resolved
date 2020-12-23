@@ -1,0 +1,207 @@
+---
+title: "DSM Calculation for Larger Brescia Cohort"
+output: 
+  html_document:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+Validate DSM association with disease severity using Brescia cohort not in the citeseq
+```{r setup, include=FALSE}
+input.folder <- "input.data"
+data.folder <- "output/DSM"
+library(knitr)
+library(ggplot2)
+library(ggsci)
+library(ggpubr)
+#library(ggfortify)
+library(Hmisc)
+#library(GGally)
+#library(plsRglm)
+knitr::opts_chunk$set(echo = TRUE)
+options(stringsAsFactors = FALSE)
+opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+
+load(file.path(input.folder,"covid19.metadata.paper1.RData"),verbose=T)
+dsm.data <- readRDS(file.path(data.folder,"citeseq.patient.end.points.RDS"))
+```
+
+### Earliest cytokine measurements for each patient
+```{r}
+# using one of the cytokines to check
+cytokine.measurements <- subset(covid19.lab.results,test_name == "TNF-a")
+sum(is.na(cytokine.measurements$days_from_admission_to_test))
+sum(is.na(cytokine.measurements$days_from_symptom_onset_to_test))
+cytokine.measurements <- cytokine.measurements[order(cytokine.measurements$days_from_admission_to_test,
+                                                     cytokine.measurements$days_from_symptom_onset_to_test,cytokine.measurements$test_time_point.Serum),]
+cytokine.measurements.earliest <- cytokine.measurements[!duplicated(cytokine.measurements$subject_id),]
+cat("Number of patients with cytokine data:\n")
+dim(cytokine.measurements.earliest)
+#table(cytokine.measurements.earliest$visit)
+
+# patients with symptom onset and admission dates and cytokine data within 30 days of onset
+cytokine.measurements.earliest.30days <- subset(cytokine.measurements.earliest,
+                                                !is.na(days_from_symptom_onset_to_test) & !is.na(days_from_admission_to_test) & 
+                                                  days_from_symptom_onset_to_test < 30)
+cat("Patients with symptom onset and admission dates and cytokine data within 30 days of onset:\n")
+dim(cytokine.measurements.earliest.30days)
+```
+
+#### Earliest SpO2/FiO2 timepoint
+```{r o2.measurements}
+o2.measurements <- subset(covid19.lab.results,test_name == "SpO2/FiO2")
+sum(is.na(o2.measurements$days_from_admission_to_test))
+sum(is.na(o2.measurements$days_from_symptom_onset_to_test))
+
+o2.measurements.merged <- merge(o2.measurements,cytokine.measurements,by=c("subject_id","days_from_symptom_onset_to_test"),suffixes = c("",".y"))
+o2.measurements.merged <- o2.measurements.merged[order(o2.measurements.merged$days_from_admission_to_test,
+                                                     o2.measurements.merged$days_from_symptom_onset_to_test,o2.measurements.merged$test_time_point.Serum),]
+o2.measurements.earliest <- o2.measurements.merged[!duplicated(o2.measurements.merged$subject_id),]
+cat("Number of patients with o2 data:\n")
+dim(o2.measurements.earliest)
+
+# patients with symptom onset and admission dates and o2 data within 30 days of onset
+o2.measurements.earliest.30days <- subset(o2.measurements.earliest,
+                                                !is.na(days_from_symptom_onset_to_test) & !is.na(days_from_admission_to_test) & 
+                                                  days_from_symptom_onset_to_test < 30)
+cat("Patients with symptom onset and admission dates and o2 data within 30 days of onset:\n")
+dim(o2.measurements.earliest.30days)
+```
+
+### Gather features
+```{r features}
+cytokine.measurements.earliest.30days.optimized <- cytokine.measurements.earliest.30days
+# remove the CITE-seq patients
+cytokine.measurements.earliest.30days.optimized <- subset(cytokine.measurements.earliest.30days.optimized,!(subject_id %in% 
+                                                            unique(subset(covid19.samples,!is.na(batch))$subject_id)))
+
+paramaters.of.interest <- c("SpO2/FiO2","CRP","IL-6","TNF-a","TNF-b","IL-18/IL-1f4","ANC/ALC Ratio","IP-10","D-Dimer","IFN-Gamma","CXCL9/MIG",
+                            "IL-17","IL-4","IL-13","Fibrinogen","Lymphocytes",#"Serology Spike","Serology Nucleocapsid"
+                            "Lactate Dehydrogenase (LDH)","Platelets (PLT)")#,"Neutrophils")
+setdiff(tolower(paramaters.of.interest),tolower(covid19.lab.results$test_name))
+selected.lab.values <- subset(covid19.lab.results,subject_id %in% cytokine.measurements.earliest.30days.optimized$subject_id
+  & tolower(test_name) %in% tolower(paramaters.of.interest) & test_id != "Lymphocytes_pct")
+
+# measurements within +/- 2 days of target
+selected.lab.values.expanded <- data.frame()
+day.margin <- 2
+for (i in 1:nrow(cytokine.measurements.earliest.30days.optimized)) {
+  subj <- cytokine.measurements.earliest.30days.optimized$subject_id[i]
+  #cat(i,"-",subj,"\n")
+  days_from_symptom_onset <- cytokine.measurements.earliest.30days.optimized$days_from_symptom_onset_to_test[i]
+  tmp <- subset(selected.lab.values,subject_id == subj &
+    days_from_symptom_onset_to_test <= (days_from_symptom_onset + day.margin) & 
+      days_from_symptom_onset_to_test >= (days_from_symptom_onset - day.margin))
+  tmp$target.day.diff <- abs(tmp$days_from_symptom_onset_to_test - days_from_symptom_onset)
+  #print(table(tmp$target.day.diff))
+  
+  tmp <- tmp[order(tmp$target.day.diff,decreasing = F),]
+  tmp$test_date_id <- apply(tmp[,c("subject_id","test_id","days_from_symptom_onset_to_test")],1,paste0,collapse=":")
+  tmp <- subset(tmp,test_date_id %in% tmp[!duplicated(tmp[,c("subject_id","test_id")]),]$test_date_id) # keep multiple values taken on the same closest day
+  #tmp <- tmp[!duplicated(tmp[,c("subject_id","test_id")]),]
+  selected.lab.values.expanded <- rbind(selected.lab.values.expanded,tmp)
+}
+#table(selected.lab.values.expanded[,c("subject_id","target.day.diff")])
+selected.lab.values.expanded.avg <- reshape2::dcast(selected.lab.values.expanded,subject_id ~ test_id,
+                                               value.var = "test_value",fun.aggregate = function(x){mean(x,na.rm = T)})
+rownames(selected.lab.values.expanded.avg) <- selected.lab.values.expanded.avg$subject_id
+selected.lab.values.expanded.avg <- selected.lab.values.expanded.avg[,-1]
+rowSums(is.na(selected.lab.values.expanded.avg))
+table(rowSums(is.na(selected.lab.values.expanded.avg)))
+colSums(is.na(selected.lab.values.expanded.avg))
+
+# remove patients with too many NAs
+max.na <- 5
+selected.patients <- names(which(rowSums(is.na(selected.lab.values.expanded.avg)) <= max.na))
+selected.lab.values.expanded.avg.filtered <- selected.lab.values.expanded.avg[selected.patients,grep("IL.6_ng.L",colnames(selected.lab.values.expanded.avg),invert = T)]
+colSums(is.na(selected.lab.values.expanded.avg.filtered))
+```
+
+### Data Transformation
+```{r transform, out.width="800px",fig.height=8}
+# transform to log10
+selected.lab.values.expanded.avg.filtered <- log10(selected.lab.values.expanded.avg.filtered+0.01)
+
+covid19.patient.demo$severity.outcome <- paste0(covid19.patient.demo$severity,"-",covid19.patient.demo$outcome)
+severity.color <- ggsci::pal_jama()(4)
+names(severity.color) <- sort(unique(covid19.patient.demo[selected.patients,]$severity.outcome))
+pheatmap::pheatmap(as.matrix(scale(selected.lab.values.expanded.avg.filtered)),
+                   annotation_row = covid19.patient.demo[selected.patients,c("severity.outcome"),drop=F],
+                   color = viridis::inferno(64),breaks=c(-6,seq(-3,3,by=0.1),6),fontsize = 6,
+                   annotation_colors = list(sex=c("F"="darkred","M"="darkblue"),severity.outcome=severity.color),
+                   main="All earliest time-point batch samples (values from time point +/- 2 days)")
+
+# impute remaining missing data
+#set.seed(1087)
+set.seed(10276)
+selected.lab.values.expanded.avg.imputed <- selected.lab.values.expanded.avg.filtered
+imputed.obj <- aregImpute(formula = as.formula(paste0("~ ",paste0(colnames(selected.lab.values.expanded.avg.filtered),collapse = " + "))), 
+                                                           data =  selected.lab.values.expanded.avg.filtered, n.impute = 5, type = "regression",nk = 0)
+imputed.values <- impute.transcan(imputed.obj,imputation = 1,data=selected.lab.values.expanded.avg.filtered,list.out=TRUE)
+selected.lab.values.expanded.avg.imputed[names(imputed.values)] <- imputed.values
+
+pheatmap::pheatmap(as.matrix(scale(selected.lab.values.expanded.avg.imputed)),
+                   annotation_row = covid19.patient.demo[selected.patients,c("severity.outcome"),drop=F],
+                   color = viridis::inferno(64),breaks=c(-6,seq(-3,3,by=0.1),6),fontsize = 6,
+                   annotation_colors = list(sex=c("F"="darkred","M"="darkblue"),severity.outcome=severity.color),
+                   main="All earliest time-point batch samples (values from time point +/- 2 days or imputed)")
+
+# correct for days from symptom onset or admission 
+correct.for <- cytokine.measurements.earliest.30days.optimized[match(rownames(selected.lab.values.expanded.avg.imputed),
+                                                           cytokine.measurements.earliest.30days.optimized$subject_id),
+                                                     "days_from_admission_to_test"]
+correct.for.alt <- cytokine.measurements.earliest.30days.optimized[match(rownames(selected.lab.values.expanded.avg.imputed),
+                                                           cytokine.measurements.earliest.30days.optimized$subject_id),
+                                                     "days_from_symptom_onset_to_test"]
+selected.lab.values.expanded.avg.imputed.corrected <- t(limma::removeBatchEffect(t(selected.lab.values.expanded.avg.imputed),
+                  covariates = correct.for))
+selected.lab.values.expanded.avg.imputed.corrected.alt <- t(limma::removeBatchEffect(t(selected.lab.values.expanded.avg.imputed),
+                  covariates = correct.for.alt))
+#batch.sample.lab.values.expanded.avg.imputed.corrected <- batch.sample.lab.values.expanded.avg.imputed.corrected.alt <- batch.sample.lab.values.expanded.avg.imputed
+
+```
+
+### DSM calculation
+```{r dsm, fig.cap="Fig 1E",out.width=800}
+dsm.paramaters <- c("SpO2.FiO2_.ratio","IL.6","IL.13","TNF.b","ANC.ALC.Ratio_.ratio","IP.10","D.Dimer_ng.mL",
+                    "Lymphocytes_x10.3.uL","Lactate.Dehydrogenase.LDH_U.L")
+
+lab.pca <- prcomp(selected.lab.values.expanded.avg.imputed.corrected[,dsm.paramaters],scale. = T,center = T)
+pca.summary <- summary(lab.pca)
+# PCA plot
+cytokine.measurements.earliest.30days.pc <- merge(cytokine.measurements.earliest.30days.optimized,lab.pca$x[,1:2],by.x="subject_id",by.y="row.names")
+cytokine.measurements.earliest.30days.pc$severity.outcome <- factor(covid19.patient.demo[cytokine.measurements.earliest.30days.pc$subject_id,]$severity.outcome,
+                                                                    levels=c("Moderate-Alive","Severe-Alive","Critical-Alive","Critical-Deceased"))
+
+# violin plot by severity group
+comparisons <- gtools::combinations(4,2,names(severity.color))
+comparisons <- comparisons[comparisons[,1] != comparisons[,2],]
+comparisons <- lapply(1:nrow(comparisons),function(x){comparisons[x,]})
+# ggviolin(cytokine.measurements.earliest.30days.pc,x="severity.outcome",y="PC1", add = "boxplot",palette = c("#00A1D5FF","#B24745FF","#374E55FF","#DF8F44FF"),
+#          fill="severity.outcome",add.params = list(fill="white"),xlab = "Severity-Outcome",ylab="Disease Severity Metric (DSM)") + 
+#   geom_point(alpha=0.25,size=2) + 
+#   stat_compare_means(comparisons = comparisons,hide.ns = T,label = "p.signif",tip.length = 0,method = "wilcox.test") + 
+#   theme(text = element_text(size=8))
+
+variables <- c("subject_id","PC1","severity","outcome")
+combined.dsm <- rbind(data.frame(cohort="CITE-Seq",dsm.data[,variables]),
+                      data.frame(cohort="Independent",cytokine.measurements.earliest.30days.pc[,variables]))
+combined.dsm$severity.outcome <- factor(paste0(combined.dsm$severity,"-",combined.dsm$outcome),
+                                        levels=c("Moderate-Alive","Severe-Alive","Critical-Alive","Critical-Deceased"))
+combined.dsm <- merge(combined.dsm,as.data.frame(table(combined.dsm[,c("cohort","severity.outcome")])))
+combined.dsm$class.label <- paste0(combined.dsm$severity.outcome," (",combined.dsm$Freq,")")
+combined.dsm <- combined.dsm[order(combined.dsm$severity.outcome),]
+ggplot(combined.dsm,aes(severity.outcome,PC1)) + geom_boxplot(aes(fill=severity.outcome)) + 
+  geom_point(alpha=0.5) + facet_grid(~cohort,scales = "free_x") + 
+  stat_compare_means(comparisons = comparisons,hide.ns = T,label = "p.signif",tip.length = 0,method = "wilcox.test") + 
+  scale_fill_manual(values=severity.color) +
+  theme_classic2() + theme(text = element_text(size=8),axis.text.x = element_text(angle=45,hjust = 1)) + 
+  ylab("Disease Severity Metric (DSM)") + xlab("") 
+```
+
+### Session Info
+```{r save}
+sessionInfo()
+```

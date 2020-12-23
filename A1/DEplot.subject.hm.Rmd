@@ -1,0 +1,296 @@
+---
+title: "Pseudobulk gene expression heatmaps"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(limma)
+library(edgeR)
+library(Biobase)
+library(tidyverse)
+library(openxlsx)
+library(ComplexHeatmap)
+library(pheatmap)
+library(circlize)
+source("util_fun/subject.LE.hm.funs.R")
+```
+
+
+## pseudobulk heatmaps
+**Figure 3 C,F; Figure 4 D,E,F,H; Figure S3 C; Figure S4 G,H**  
+input data from pseudobulk eset object -- output from pseudobulk.normalize.esetlist.R script  
+
+```{r input}
+DGE_IN_PATH <- "input/differential_expression/"
+eset_list <- readRDS("output/dge_lists/pbulk_eset_list_normalized_WCTcourse_metafiltered.rds")
+eset_list_sorted <- readRDS("output/dge_lists/pbulk_eset_list_normalized_specific_gating_metafiltered.rds")
+
+# get only T0 samples and remove technical control CHI014
+eset_list_T0 <- lapply(eset_list, function(dge){
+  filter <- colnames(dge)[dge@phenoData@data$Timepoint %in% c("T0", "HC") & 
+                            !is.na(dge@phenoData@data$PC1_cat) & 
+                            dge@phenoData@data$Donor != "CHI014"]
+  dge <- dge[,filter]
+})
+
+eset_list_sorted_T0 <- lapply(eset_list_sorted, function(dge){
+  filter <- colnames(dge)[dge@phenoData@data$Timepoint %in% c("T0", "HC") & 
+                            !is.na(dge@phenoData@data$PC1_cat) & 
+                            dge@phenoData@data$Donor != "CHI014"]
+  dge <- dge[,filter]
+})
+
+# read in selected_pathway_summary.xlsx
+pathways <- read.xlsx("input/selected_pathway_summary.xlsx", sheet = "reduced", startRow = 1)
+IFNsets <- filter(pathways, Category %in% c("Type I IFN response", 
+                                            "Vaccine_infection induced early blood transcriptomic signature"))
+Agpresets <- filter(pathways, Primary_gene_sets %in% c("KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION"))
+translationsets <- filter(pathways, Category %in% c("Translation/ribosome"))
+NFkBsets <- filter(pathways, Primary_gene_sets %in% c("HALLMARK_TNFA_SIGNALING_VIA_NFKB"))
+apoptsets <- filter(pathways, Category %in% c("Apoptosis and cell death"))
+inflamsets <- filter(pathways, Primary_gene_sets %in% c("HALLMARK_INFLAMMATORY_RESPONSE"))
+fattysets <- filter(pathways, Primary_gene_sets %in% c("reactome_Fatty acid metabolism"))
+chemoksets <- filter(pathways, Primary_gene_sets %in% c("KEGG_CHEMOKINE_SIGNALING_PATHWAY","GO_CELLULAR_RESPONSE_TO_INTERLEUKIN_1"))
+```
+
+## UnSorted populations
+Comparison groups: PC1 & COVIDvsHC
+T0 only
+### Mono_Classical
+#### IFN
+showing the shared leading edge genes of PC1 & COVIDvsHC
+```{r, fig.width = 12, fig.height = 3.5}
+Mono_Classical <- eset_list_T0$Mono_Classical
+# read in fgsea results to get LE genes
+Mono_Classical_PC1 <- read.delim(paste0(DGE_IN_PATH, "fgsea_tables/PC1/Mono_Classical--model@PC1--coef@PC1--fgsea.tsv"), header = TRUE)
+Mono_Classical_covid <- read.delim(paste0(DGE_IN_PATH, "fgsea_tables/COVID-Healthy/Mono_Classical--model@healthy_vs_covid--coef@COVID-Healthy--fgsea.tsv"), header = TRUE)
+
+Mono_Classical_PC1_IFN <- Mono_Classical_PC1 %>% filter(pathway %in% IFNsets$Primary_gene_sets)
+Mono_Classical_covid_IFN <- Mono_Classical_covid %>% filter(pathway %in% IFNsets$Primary_gene_sets)
+Mono_Classical_PC1_IFN_LE <- unique(unlist(sapply(Mono_Classical_PC1_IFN$leadingEdge, function(x) str_split(x, pattern = " "))))
+Mono_Classical_covid_IFN_LE <- unique(unlist(sapply(Mono_Classical_covid_IFN$leadingEdge, function(x) str_split(x, pattern = " "))))
+Mono_Classical_IFN_LE <- intersect(Mono_Classical_PC1_IFN_LE,Mono_Classical_covid_IFN_LE)
+
+Mono_Classical_mtx_co <- exprs(Mono_Classical)[Mono_Classical_IFN_LE, ]
+meta <- pData(Mono_Classical) %>% dplyr::arrange(Class,PC1)
+Mono_Classical_mtx_co <- Mono_Classical_mtx_co[,rownames(meta)]
+
+# pdf("output/Subjecthm_Mono_Classical_coLE_IFN.pdf", width = 12, height = 3.6)
+subject.hm(exprs_mtx = Mono_Classical_mtx_co, meta = meta, celltype = "Mono_Classical", module = "IFN")
+# dev.off()
+```
+
+  
+#### translation
+showing the shared leading edge genes of PC1 & COVIDvsHC
+```{r, fig.width = 12, fig.height = 4.5}
+Mono_Classical_PC1_translation <- Mono_Classical_PC1 %>% filter(pathway %in% translationsets$Primary_gene_sets)
+Mono_Classical_covid_translation <- Mono_Classical_covid %>% filter(pathway %in% translationsets$Primary_gene_sets)
+Mono_Classical_PC1_translation_LE <- unique(unlist(sapply(Mono_Classical_PC1_translation$leadingEdge, function(x) str_split(x, pattern = " "))))
+Mono_Classical_covid_translation_LE <- unique(unlist(sapply(Mono_Classical_covid_translation$leadingEdge, function(x) str_split(x, pattern = " "))))
+Mono_Classical_translation_LE <- intersect(Mono_Classical_PC1_translation_LE,Mono_Classical_covid_translation_LE)
+
+Mono_Classical_mtx_co <- exprs(Mono_Classical)[Mono_Classical_translation_LE, ]
+meta <- pData(Mono_Classical) %>% dplyr::arrange(Class,PC1)
+Mono_Classical_mtx_co <- Mono_Classical_mtx_co[,rownames(meta)]
+
+# pdf("output/Subjecthm_Mono_Classical_coLE_translation.pdf", width = 12, height = 4.5)
+subject.hm(exprs_mtx = Mono_Classical_mtx_co, meta = meta, celltype = "Mono_Classical", module = "translation")
+# dev.off()
+```
+
+
+#### NFkB
+showing the leading edege gene of PC1 association (severity)
+```{r, fig.width = 12, fig.height = 7}
+Mono_Classical_PC1_NFkB <- Mono_Classical_PC1 %>% filter(pathway %in% NFkBsets$Primary_gene_sets)
+Mono_Classical_covid_NFkB <- Mono_Classical_covid %>% filter(pathway %in% NFkBsets$Primary_gene_sets)
+Mono_Classical_PC1_NFkB_LE <- unique(unlist(sapply(Mono_Classical_PC1_NFkB$leadingEdge, function(x) str_split(x, pattern = " "))))
+Mono_Classical_covid_NFkB_LE <- unique(unlist(sapply(Mono_Classical_covid_NFkB$leadingEdge, function(x) str_split(x, pattern = " "))))
+Mono_Classical_NFkB_LE <- intersect(Mono_Classical_PC1_NFkB_LE,Mono_Classical_covid_NFkB_LE)
+
+Mono_Classical_mtx_PC1 <- exprs(Mono_Classical)[Mono_Classical_PC1_NFkB_LE, ]
+meta <- pData(Mono_Classical) %>% dplyr::arrange(Class,PC1)
+Mono_Classical_mtx_PC1 <- Mono_Classical_mtx_PC1[,rownames(meta)]
+
+# pdf("output/Subjecthm_Mono_Classical_PC1LE_NFkB.pdf", width = 12, height = 7)
+subject.hm.PC1(exprs_mtx = Mono_Classical_mtx_PC1, meta = meta, 
+               celltype = "Mono_Classical", module = "NFkB",
+               PC1LEset = Mono_Classical_PC1_NFkB_LE, 
+               covidLEset = Mono_Classical_covid_NFkB_LE)
+# dev.off()
+```
+
+
+#### HALLMARK Inflammation
+showing the leading edege gene of PC1 association (severity)
+```{r, fig.width = 12, fig.height = 6.5}
+Mono_Classical_PC1_inflam <- Mono_Classical_PC1 %>% filter(pathway %in% inflamsets$Primary_gene_sets)
+Mono_Classical_covid_inflam <- Mono_Classical_covid %>% filter(pathway %in% inflamsets$Primary_gene_sets)
+Mono_Classical_PC1_inflam_LE <- unique(unlist(sapply(Mono_Classical_PC1_inflam$leadingEdge, function(x) str_split(x, pattern = " "))))
+Mono_Classical_covid_inflam_LE <- unique(unlist(sapply(Mono_Classical_covid_inflam$leadingEdge, function(x) str_split(x, pattern = " "))))
+Mono_Classical_inflam_LE <- intersect(Mono_Classical_PC1_inflam_LE,Mono_Classical_covid_inflam_LE)
+
+Mono_Classical_mtx_PC1 <- exprs(Mono_Classical)[Mono_Classical_PC1_inflam_LE, ]
+meta <- pData(Mono_Classical) %>% dplyr::arrange(Class,PC1)
+Mono_Classical_mtx_PC1 <- Mono_Classical_mtx_PC1[,rownames(meta)]
+
+# pdf("output/Subjecthm_Mono_Classical_PC1LE_inflam.pdf", width = 12, height = 6.5)
+subject.hm.PC1(exprs_mtx = Mono_Classical_mtx_PC1, meta = meta, 
+               celltype = "Mono_Classical", module = "inflam",
+               PC1LEset = Mono_Classical_PC1_inflam_LE, 
+               covidLEset = Mono_Classical_covid_inflam_LE)
+# dev.off()
+
+```
+
+
+### NK_CD16hi
+#### NFkB
+showing the leading edege gene of PC1 association (severity)  
+```{r, fig.width = 11.5, fig.height = 5.5}
+NK_CD16hi <- eset_list_T0$NK_CD16hi
+# read in fgsea results to get LE genes
+NK_CD16hi_PC1 <- read.delim(paste0(DGE_IN_PATH, "fgsea_tables/PC1/NK_CD16hi--model@PC1--coef@PC1--fgsea.tsv"), header = TRUE)
+NK_CD16hi_covid <- read.delim(paste0(DGE_IN_PATH, "fgsea_tables/COVID-Healthy/NK_CD16hi--model@healthy_vs_covid--coef@COVID-Healthy--fgsea.tsv"), header = TRUE)
+
+NK_CD16hi_PC1_NFkB <- NK_CD16hi_PC1 %>% filter(NK_CD16hi_PC1$pathway %in% NFkBsets$Primary_gene_sets)
+NK_CD16hi_covid_NFkB <- NK_CD16hi_covid %>% filter(NK_CD16hi_covid$pathway %in% NFkBsets$Primary_gene_sets)
+NK_CD16hi_PC1_NFkB_LE <- unique(unlist(sapply(NK_CD16hi_PC1_NFkB$leadingEdge, function(x) str_split(x, pattern = " "))))
+NK_CD16hi_covid_NFkB_LE <- unique(unlist(sapply(NK_CD16hi_covid_NFkB$leadingEdge, function(x) str_split(x, pattern = " "))))
+NK_CD16hi_NFkB_LE <- intersect(NK_CD16hi_PC1_NFkB_LE,NK_CD16hi_covid_NFkB_LE)
+
+NK_CD16hi_mtx_PC1 <- exprs(NK_CD16hi)[NK_CD16hi_PC1_NFkB_LE, ]
+meta <- pData(NK_CD16hi) %>% dplyr::arrange(Class,PC1)  
+NK_CD16hi_mtx_PC1 <- NK_CD16hi_mtx_PC1[,rownames(meta)]
+
+# pdf("output/Subjecthm_NK_CD16hi_PC1LE_NFkB.pdf", width = 11.5, height = 5.5)
+subject.hm.PC1(exprs_mtx = NK_CD16hi_mtx_PC1, meta = meta, celltype = "NK_CD16hi", module = "NFkB",
+               PC1LEset = NK_CD16hi_PC1_NFkB_LE, covidLEset = NK_CD16hi_covid_NFkB_LE)
+# dev.off()
+```
+ 
+
+#### chemokine and IL1 response in severity network  
+showing the leading edege gene of PC1 association (severity)  
+```{r, fig.width = 11.5, fig.height = 5}
+NK_CD16hi_PC1_chemok <- NK_CD16hi_PC1 %>% filter(NK_CD16hi_PC1$pathway %in% chemoksets$Primary_gene_sets)
+NK_CD16hi_covid_chemok <- NK_CD16hi_covid %>% filter(NK_CD16hi_covid$pathway %in% chemoksets$Primary_gene_sets)
+NK_CD16hi_PC1_chemok_LE <- unique(unlist(sapply(NK_CD16hi_PC1_chemok$leadingEdge, function(x) str_split(x, pattern = " "))))
+NK_CD16hi_covid_chemok_LE <- unique(unlist(sapply(NK_CD16hi_covid_chemok$leadingEdge, function(x) str_split(x, pattern = " "))))
+NK_CD16hi_chemok_LE <- intersect(NK_CD16hi_PC1_chemok_LE,NK_CD16hi_covid_chemok_LE)
+
+NK_CD16hi_mtx_PC1 <- exprs(NK_CD16hi)[NK_CD16hi_PC1_chemok_LE, ]
+meta <- pData(NK_CD16hi) %>% dplyr::arrange(Class,PC1)  
+NK_CD16hi_mtx_PC1 <- NK_CD16hi_mtx_PC1[,rownames(meta)]
+
+# pdf("pbulk/Subjecthm_NK_CD16hi_PC1LE_chemok.pdf", width = 11.5, height = 5)
+subject.hm.PC1(exprs_mtx = NK_CD16hi_mtx_PC1, meta = meta, 
+               celltype = "NK_CD16hi", module = "chemok",
+               PC1LEset = NK_CD16hi_PC1_chemok_LE, covidLEset = NK_CD16hi_covid_chemok_LE)
+# dev.off()
+```
+
+
+#### Fatty acid metabolism  
+showing the leading edege gene of PC1 association (severity)  
+```{r, fig.width = 11.5, fig.height = 5}
+NK_CD16hi_PC1_fatty <- NK_CD16hi_PC1 %>% filter(NK_CD16hi_PC1$pathway %in% fattysets$Primary_gene_sets)
+NK_CD16hi_covid_fatty <- NK_CD16hi_covid %>% filter(NK_CD16hi_covid$pathway %in% fattysets$Primary_gene_sets)
+# add IFNg manually as contrast
+NK_CD16hi_PC1_fatty_LE <- c(unique(unlist(sapply(NK_CD16hi_PC1_fatty$leadingEdge, function(x) str_split(x, pattern = " ")))), "IFNG")
+NK_CD16hi_covid_fatty_LE <- c(unique(unlist(sapply(NK_CD16hi_covid_fatty$leadingEdge, function(x) str_split(x, pattern = " ")))), "IFNG")
+NK_CD16hi_fatty_LE <- intersect(NK_CD16hi_PC1_fatty_LE,NK_CD16hi_covid_fatty_LE)
+
+NK_CD16hi_mtx_PC1 <- exprs(NK_CD16hi)[NK_CD16hi_PC1_fatty_LE, ]
+meta <- pData(NK_CD16hi) %>% dplyr::arrange(Class,PC1)  
+NK_CD16hi_mtx_PC1 <- NK_CD16hi_mtx_PC1[,rownames(meta)]
+
+# set cluster genesets
+catabolicgene <- read.xlsx("input/fatty acid LE NK16hi gene categories (biosynthetic vs catabolic).xlsx", sheet = "catabolic", rowNames = TRUE, colNames = TRUE)$Gene.Symbol
+biosyngene <- read.xlsx("input/fatty acid LE NK16hi gene categories (biosynthetic vs catabolic).xlsx", sheet = "biosynthetic", rowNames = TRUE, colNames = TRUE)$Gene.Symbol
+fatty_NK <- vector(length = length(NK_CD16hi_PC1_fatty_LE))
+fatty_NK <- replace(fatty_NK, which(rownames(NK_CD16hi_mtx_PC1) %in% biosyngene), "biosynthetic")
+fatty_NK <- replace(fatty_NK, which(rownames(NK_CD16hi_mtx_PC1) %in% catabolicgene), "catabolic")
+fatty_NK <- replace(fatty_NK, which(rownames(NK_CD16hi_mtx_PC1) == "IFNG"), "IFNG")
+fatty_NK <- replace(fatty_NK, which(fatty_NK == "FALSE"), "others")
+
+# pdf("output/Subjecthm_NK_CD16hi_PC1LE_fatty.pdf", width = 11.5, height = 5)
+subject.hm.wsplit(exprs_mtx = NK_CD16hi_mtx_PC1, meta = meta, celltype = "NK_CD16hi", module = "fatty", rowsplit = fatty_NK)
+# dev.off()
+```
+
+
+### pDC
+#### apoptosis/cell death
+```{r, fig.width = 10, fig.height = 4}
+pDC <- eset_list_T0$pDC
+pDC_PC1 <- read.delim(paste0(DGE_IN_PATH, "fgsea_tables/PC1/pDC--model@PC1--coef@PC1--fgsea.tsv"), header = TRUE)
+pDC_covid <- read.delim(paste0(DGE_IN_PATH, "fgsea_tables/COVID-Healthy/pDC--model@healthy_vs_covid--coef@COVID-Healthy--fgsea.tsv"), header = TRUE)
+
+pDC_PC1_apopt <- pDC_PC1 %>% filter(pDC_PC1$pathway %in% apoptsets$Primary_gene_sets)
+pDC_covid_apopt <- pDC_covid %>% filter(pDC_covid$pathway %in% apoptsets$Primary_gene_sets)
+pDC_PC1_apopt_LE <- unique(unlist(sapply(pDC_PC1_apopt$leadingEdge, function(x) str_split(x, pattern = " "))))
+pDC_covid_apopt_LE <- unique(unlist(sapply(pDC_covid_apopt$leadingEdge, function(x) str_split(x, pattern = " "))))
+pDC_apopt_LE <- intersect(pDC_PC1_apopt_LE,pDC_covid_apopt_LE)
+
+pDC_mtx_union <- exprs(pDC)[union(pDC_PC1_apopt_LE,pDC_covid_apopt_LE), ]
+meta <- pData(pDC) %>% dplyr::arrange(Class,PC1)
+pDC_mtx_union <- pDC_mtx_union[,rownames(meta)]
+
+# customize pDC LE heatmap by highlighting the reactome_Oxidative Stress Induced Senescence geneset
+# set marked genesets
+PC1_COVID <- rownames(pDC_mtx_union) %in% pDC_apopt_LE
+oxi_stress_LE <- filter(pDC_PC1, pathway %in% "reactome_Oxidative Stress Induced Senescence")$leadingEdge
+oxi_stress <- rownames(pDC_mtx_union) %in% unlist(str_split(oxi_stress_LE, pattern = " "))
+names(oxi_stress) <- rownames(pDC_mtx_union)
+
+label <- which(rownames(pDC_mtx_union) %in% union(pDC_PC1_apopt_LE,pDC_covid_apopt_LE)[1:20])
+label_genes <- rownames(pDC_mtx_union)[label]
+
+# set colors
+col_fun = colorRamp2(c(-1.5, 0, 1.5), c("#FF00FF", "#000000", "#FFFF00"))
+severity.color <- c("Critical-Alive"="#374E55FF","Critical-Deceased"="#DF8F44FF","Moderate-Alive"="#00A1D5FF" ,"Severe-Alive"="#B24745FF","HC" = "#79AF97FF")
+PC1.color <- colorRamp2(c(-3, 3.6), c("white", "#e97171"))
+Class.color <- c("HC" = "#F8766D", "COVID" = "#eebb4d")
+PC1class.color <- c("HC"="#00BA38", "PC1_low"="#619CFF", "PC1_high"="#F8766D")
+
+# set heatmap annotation
+ha = HeatmapAnnotation(
+  PC1class = meta$PC1_cat,
+  PC1 = meta$PC1, 
+  Severity_outcome = meta$severity.outcome2,
+  col = list(PC1 = PC1.color,
+             PC1class = PC1class.color,
+             Severity_outcome = severity.color)
+)
+
+# pdf("pbulk/Subjecthm_pDC_unionLE_apopt2.pdf", width = 10, height = 4)
+p <- Heatmap(pheatmap:::scale_rows(pDC_mtx_union), name = paste("pDC", "apopt", sep = "_"), 
+             show_column_names = FALSE,
+             top_annotation = ha, cluster_columns = FALSE,
+             column_split = meta$PC1_cat,
+             row_split = PC1_COVID,
+             col = col_fun,
+             # row_names_gp = gpar(col = c("blue", "black"), fontsize = c(10, 10)),
+             column_gap = unit(4, "mm")
+)+
+  Heatmap(PC1_COVID + 0, name = "coLE", col = c("0" = "white", "1" = "blue"), 
+          show_heatmap_legend = FALSE, width = unit(5, "mm")) +
+  Heatmap(oxi_stress + 0, name = "OxiSenes", col = c("0" = "white", "1" = "green"), 
+          show_row_names = TRUE, row_names_gp = gpar(fontsize = 10),
+          show_heatmap_legend = FALSE, width = unit(5, "mm")) +
+  rowAnnotation(foo = anno_mark(at = label,
+                                labels = label_genes,
+                                labels_gp = gpar(fontsize = 10)))
+p
+# dev.off()
+```
+  
+
+```{r}
+sI <- sessionInfo()
+utils:::print.sessionInfo(sI[-c(10,11)])
+```

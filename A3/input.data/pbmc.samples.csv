@@ -1,0 +1,58 @@
+subject_id,sample_label,visit,sex,age,severity,outcome,days_from_symptom_onset_to_sample_drawn,days_from_admission_to_sample_drawn,steroid.use,o2.supplement,collected.in.icu,WHO.ordinal.scale.at.time.of.sampling
+HGR0000042,BS-EQ-0015,T0,M,53,Critical,Alive,12,7,,CPAP Venturi Mask,FALSE,5
+HGR0000042,BS-EQ-0015,T1,M,53,Critical,Alive,18,13,,Low-Flow Oxygen*,FALSE,4
+HGR0000051,BS-EQ-0014,T0,M,55,Critical,Alive,10,3,Dexamethasone,CPAP* Venturi Mask* Non-Invasive Ventilation Or High Flow Oxygen* Reservoir Mask*,FALSE,5
+HGR0000051,BS-EQ-0014,T1,M,55,Critical,Alive,14,7,Dexamethasone,CPAP* Venturi Mask* Non-Invasive Ventilation Or High Flow Oxygen* Reservoir Mask*,FALSE,5
+HGR0000051,BS-EQ-0014,T2,M,55,Critical,Alive,17,10,Dexamethasone,CPAP* Venturi Mask* Non-Invasive Ventilation Or High Flow Oxygen* Reservoir Mask*,FALSE,5
+HGR0000051,BS-EQ-0014,T3,M,55,Critical,Alive,20,13,,CPAP* Venturi Mask* Non-Invasive Ventilation Or High Flow Oxygen* Reservoir Mask*,FALSE,5
+HGR0000069,BS-EQ-0001,T0,M,54,Critical,Alive,13,1,Dexamethasone,Venturi Mask* Reservoir Mask*,FALSE,5
+HGR0000069,BS-EQ-0001,T1,M,54,Critical,Alive,20,8,Dexamethasone,Venturi Mask* Reservoir Mask*,FALSE,5
+HGR0000069,BS-EQ-0001,T2,M,54,Critical,Alive,33,21,,,FALSE,1
+HGR0000071,BS-EQ-0005,T0,F,71,Critical,Deceased,8,2,Dexamethasone,,FALSE,5
+HGR0000074,BS-EQ-0026,T0,M,52,Critical,Alive,18,9,Dexamethasone,Venturi Mask*,FALSE,5
+HGR0000078,BS-EQ-0003,T0,F,40,Critical,Alive,18,13,Dexamethasone*,,FALSE,5
+HGR0000078,BS-EQ-0003,T1,F,40,Critical,Alive,23,18,Dexamethasone*,,FALSE,5
+HGR0000079,BS-EQ-0006,T0,M,37,Critical,Alive,30,6,Steroids*,Non-Invasive Ventilation Or High Flow Oxygen* Reservoir Mask*,FALSE,5
+HGR0000079,BS-EQ-0006,T1,M,37,Critical,Alive,36,12,Steroids*,Non-Invasive Ventilation Or High Flow Oxygen* Reservoir Mask*,FALSE,5
+HGR0000083,BS-EQ-0002,T0,M,55,Moderate,Alive,6,1,Steroids*,,FALSE,3
+HGR0000083,BS-EQ-0002,T1,M,55,Moderate,Alive,13,8,Steroids*,,FALSE,3
+HGR0000089,BS-EQ-0027,T1,M,78,Critical,Alive,20,8,Dexamethasone,Venturi Mask* Reservoir Mask*,FALSE,5
+HGR0000091,BS-EQ-0004,T0,M,35,Moderate,Alive,20,3,,,FALSE,4
+HGR0000092,BS-EQ-0012,T0,M,45,Critical,Alive,11,2,Dexamethasone,Face Mask* Venturi Mask* Reservoir Mask*,FALSE,4
+HGR0000092,BS-EQ-0012,T1,M,45,Critical,Alive,18,9,Dexamethasone,Face Mask* Venturi Mask* Reservoir Mask*,FALSE,5
+HGR0000093,BS-EQ-0008,T0,M,70,Critical,Alive,11,1,Steroids*,CPAP,FALSE,5
+HGR0000093,BS-EQ-0008,T1,M,70,Critical,Alive,17,7,Steroids*,CPAP,FALSE,5
+HGR0000094,BS-EQ-0007,T0,M,61,Critical,Alive,6,1,Dexamethasone,Venturi Mask* CPAP*,FALSE,5
+HGR0000094,BS-EQ-0007,T1,M,61,Critical,Alive,13,8,Dexamethasone,Reservoir Mask* Venturi Mask* CPAP*,FALSE,5
+HGR0000098,BS-EQ-0009,T0,M,60,Critical,Alive,,1,Dexamethasone,Mechanical Ventilation - endotracheal intubation* CPAP - bPAP*,FALSE,5
+HGR0000101,BS-EQ-0011,T0,M,73,Critical,Alive,8,1,Dexamethasone,Reservoir Mask* CPAP*,FALSE,5
+HGR0000101,BS-EQ-0011,T1,M,73,Critical,Alive,14,7,Dexamethasone,Reservoir Mask* CPAP*,FALSE,5
+HGR0000101,BS-EQ-0011,T3,M,73,Critical,Alive,27,20,Dexamethasone - Ongoing as of 4/20*,Reservoir Mask* CPAP*,FALSE,5
+HGR0000102,BS-EQ-0010,T0,M,58,Critical,Alive,10,3,,Venturi Mask* Reservoir Mask* CPAP - reservoir  then venturi*,FALSE,5
+HGR0000102,BS-EQ-0010,T1,M,58,Critical,Alive,17,10,,Venturi Mask* Reservoir Mask* CPAP - reservoir  then venturi*,FALSE,5
+HGR0000110,BS-EQ-0013,T0,M,73,Critical,Deceased,3,0,Steroids* Dexamethasone,,FALSE,5
+HGR0000115,BS-EQ-0032,T1,M,24,Severe,Alive,11,8,,"Venturi Mask - to 60 %. 
+O2 Saturation: 95 % on 26 March 2020*",FALSE,5
+HGR0000124,BS-EQ-0021,T0,M,79,Critical,Alive,36,28,,Reservoir Mask - (oxygen therapy reservoir mask with high flow)*,FALSE,5
+HGR0000124,BS-EQ-0021,T1,M,79,Critical,Alive,49,41,,Reservoir Mask - (oxygen therapy reservoir mask with high flow)*,FALSE,5
+HGR0000134,BS-EQ-0017,T0,M,53,Critical,Alive,16,2,,Venturi Mask - oxygen therapy with venturi mask to 60%)*,FALSE,5
+HGR0000134,BS-EQ-0017,T1,M,53,Critical,Alive,22,8,,Venturi Mask - oxygen therapy with venturi mask to 60%)*,FALSE,5
+HGR0000135,BS-EQ-0018,T0,M,59,Critical,Alive,10,3,,Reservoir Mask*,FALSE,5
+HGR0000135,BS-EQ-0018,T1,M,59,Critical,Alive,16,9,Dexamethasone,Reservoir Mask*,FALSE,5
+HGR0000136,BS-EQ-0019,T0,F,57,Moderate,Alive,17,1,,,FALSE,4
+HGR0000137,BS-EQ-0020,T0,F,79,Severe,Alive,4,1,,Oxygen - (oxygen therapy on low flow)*,FALSE,4
+HGR0000141,BS-EQ-0022,T0,M,76,Critical,Deceased,20,6,Steroids*,CPAP - cPAP to high flow*,FALSE,5
+HGR0000142,BS-EQ-0023,T0,M,49,Critical,Alive,12,0,,Venturi Mask - (Venturi mask to 31% -> reservoir to high flow)* Reservoir Mask - (Venturi mask to 31% -> reservoir to high flow)*,FALSE,5
+HGR0000143,BS-EQ-0024,T0,F,54,Critical,Alive,8,1,Steroids* Dexamethasone,,FALSE,6
+HGR0000144,BS-EQ-0028,T0,F,84,Severe,Alive,15,3,,Venturi Mask*,FALSE,4
+HGR0000144,BS-EQ-0028,T2,F,84,Severe,Alive,28,16,,Venturi Mask*,FALSE,4
+HGR0000391,BS-EQ-0029,T0,M,66,Critical,Alive,6,1,Dexamethasone,Venturi Mask - Venturi mask to 60 %*,FALSE,5
+HGR0000392,BS-EQ-0033,T0,M,52,Critical,Alive,2,2,,Reservoir Mask*,FALSE,5
+HGR0000392,BS-EQ-0033,T3,M,52,Critical,Alive,13,13,,Reservoir Mask*,FALSE,5
+HGR0000395,BS-EQ-0034,T0,M,50,Severe,Alive,14,2,,Venturi Mask*,FALSE,4
+HGR0000418,BS-EQ-0036,T1,M,50,Critical,Alive,32,11,,Reservoir Mask - high flow* Non-Invasive Ventilation Or High Flow Oxygen*,FALSE,5
+HGR0000429,BS-EQ-0043,T0,M,54,Severe,Alive,19,3,,,FALSE,4
+HGR0000429,BS-EQ-0043,T1,M,54,Severe,Alive,26,10,,,FALSE,4
+HGR0000429,BS-EQ-0043,T2,M,54,Severe,Alive,28,12,,,FALSE,4
+HGR0000430,BS-EQ-0044,T0,M,77,Critical,Deceased,16,9,Steroids* Dexamethasone,CPAP - After reservoir mask* CPAP* Reservoir Mask*,FALSE,4
+HGR0000430,BS-EQ-0044,T1,M,77,Critical,Deceased,20,13,Steroids* Dexamethasone,CPAP - After reservoir mask* CPAP* Reservoir Mask*,FALSE,5

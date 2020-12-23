@@ -1,0 +1,158 @@
+---
+title: "Permuted Cytokine Profiles for Brescia Deceased vs. Recovered"
+author: "William Lau"
+date: "Dec 14, 2020"
+output: 
+  html_document:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r setup, include=FALSE}
+data.folder <- "input.data"
+output.folder <- "output"
+library(knitr)
+library(ggplot2)
+library(ggsci)
+library(ggpubr)
+library(ggfortify)
+library(mgcv)
+library(tidymv)
+library(lme4)
+library(lmerTest)
+knitr::opts_chunk$set(echo = TRUE)
+options(stringsAsFactors = FALSE)
+opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+
+# parallel processing for permutation test
+library(BiocParallel)
+library(parallel)
+library(foreach)
+num.workers <- 60
+if (!exists("cl")) {
+  register(MulticoreParam(num.workers, progressbar = FALSE))
+  cl <- parallel::makeForkCluster(num.workers,outfile="cluster.log.txt")
+  doParallel::registerDoParallel(cl)
+  cat("Number of workers started: ",getDoParWorkers(),"\n")
+}
+
+source("critical.juncture/juncture.protein.search.R")
+```
+
+### Create sub-cohort
+Identify all deceased patients and match them with critical but recovered patients by age and gender (excluding those staying hospitalized for more than 50 days).
+Patients in the citiseq cohort can optionally be excluded.
+```{r read.data}
+load(file.path(data.folder,"covid19.metadata.paper1.RData"),verbose=F)
+covid19.lab.results$severity.outcome <- paste0(covid19.lab.results$severity,"-",covid19.lab.results$outcome)
+
+severity.color <- c("Critical-Alive"="#374E55FF","Critical-Deceased"="#DF8F44FF","Moderate-Alive"="#00A1D5FF" ,"Severe-Alive"="#B24745FF","HC" = "#79AF97FF")
+
+deceased.patients.cytokines <- subset(covid19.lab.results,outcome == "Deceased" & test_type == "ELISA" & !is.na(days_from_symptom_onset_to_test))
+deceased.patients <- unique(deceased.patients.cytokines$subject_id)
+
+cat("Map of sampling TSO time points for deceased patients:\n")
+deceased.time.points <- as.data.frame.matrix(table(deceased.patients.cytokines[,c("subject_id","days_from_symptom_onset_to_test")])) 
+colSums(deceased.time.points > 0)
+cat("Age and sex distribution:\n")
+table(subset(covid19.patient.demo,subject_id %in% deceased.patients)$sex)
+summary(subset(covid19.patient.demo,subject_id %in% deceased.patients)$age)
+
+# recovered patients with similar age and sex
+age.tol <- 3
+recovered.patients <- c()
+for (i in deceased.patients) {
+  target.age <- covid19.patient.demo[i,"age"]
+  target.sex <- covid19.patient.demo[i,"sex"]
+  cat("Target age:",target.age,"sex:",target.sex,"\n")
+  tmp <- subset(covid19.lab.results,outcome != "Deceased" & test_type == "ELISA" & !is.na(days_from_symptom_onset_to_test) & 
+           age >= target.age - age.tol & age <= target.age + age.tol & severity == "Critical" & sex == target.sex & 
+             days_from_symptom_onset_to_test > 15 & days_from_symptom_onset_to_test <= 25 &
+           number_of_days_hospitalized < 50)
+
+  matched.subject <- unique(tmp$subject_id)
+  cat("Matched subject:",matched.subject,"\n")
+  recovered.patients <- c(recovered.patients,matched.subject)
+}
+recovered.patients <- unique(recovered.patients[!is.na(recovered.patients)])
+recovered.patients.cytokines <- subset(covid19.lab.results,test_type == "ELISA" & subject_id %in% recovered.patients)
+cat("Map of samping TSO time points for recovered patients:\n")
+recovered.time.points <- as.data.frame.matrix(table(recovered.patients.cytokines[,c("subject_id","days_from_symptom_onset_to_test")])) 
+colSums(recovered.time.points > 0)
+cat("Age and sex distribution:\n")
+table(subset(covid19.patient.demo,subject_id %in% recovered.patients)$sex)
+summary(subset(covid19.patient.demo,subject_id %in% recovered.patients)$age)
+
+selected.cytokine.profiles <- rbind(deceased.patients.cytokines,recovered.patients.cytokines)
+# remove patients in citeseq
+#citeseq.patients <- subset(covid19.samples,!is.na(batch))$subject_id
+#intersect(citeseq.patients,c(recovered.patients,deceased.patients))
+#selected.cytokine.profiles <- subset(selected.cytokine.profiles,!(subject_id %in% citeseq.patients)) 
+parameter.labels <- unique(selected.cytokine.profiles[,c("test_id","test_name")])
+rownames(parameter.labels) <- parameter.labels$test_id
+parameter.labels$test_name <- gsub("/ ","/",parameter.labels$test_name,fixed = T)
+```
+
+
+### Grouping of samples
+Separate samples into interval groups relative to juncture: early (7-16 days), mid (juncture/17-23 days), and late (24-30 days)
+```{r build}
+selected.cytokine.profiles$unique.id <- make.unique(apply(selected.cytokine.profiles[,c("subject_id","days_from_admission_to_test","test_id")],1,
+                                                          paste0,collapse="."),sep = "|")
+selected.cytokine.profiles$unique.id <- sapply(selected.cytokine.profiles$unique.id,function(x){unlist(strsplit(x,"|",fixed=T))[2]})
+selected.cytokine.profiles.matrix <- reshape2::dcast(selected.cytokine.profiles,
+                                                     subject_id + age + sex + outcome + severity + days_from_symptom_onset_to_test + unique.id ~ test_id,
+                                                     value.var = "test_value")
+selected.cytokine.profiles.matrix[,colnames(selected.cytokine.profiles.matrix) %in% selected.cytokine.profiles$test_id] <-
+  apply(selected.cytokine.profiles.matrix[,colnames(selected.cytokine.profiles.matrix) %in% selected.cytokine.profiles$test_id],2,function(x){scale(log10(x+1))})
+selected.cytokine.profiles.matrix$stage <- NA
+tmp <- which(selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test >= 7 & selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test <= 16)
+selected.cytokine.profiles.matrix[tmp,"stage"] <- "early"
+tmp <- which(selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test >= 17 & selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test <= 23)
+selected.cytokine.profiles.matrix[tmp,"stage"] <- "mid"
+tmp <- which(selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test >= 24 & selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test <= 30)
+selected.cytokine.profiles.matrix[tmp,"stage"] <- "late"
+
+cat("Sample distribution:\n")
+table(selected.cytokine.profiles.matrix[,c("outcome","stage")])
+```
+<br/>
+
+
+### Permutation
+Calculate protein search FDR by permutation of subject outcome labels
+```{r permute.search}
+# permute labels
+num.perm <- 1000
+protein.search.res.permuted <- mclapply(1:num.perm,function(j) {
+  set.seed(j)
+  cat("Round",j,"\n")
+  selected.cytokine.profiles.permute <- selected.cytokine.profiles.matrix
+  subject.outcome <- unique(selected.cytokine.profiles.permute[,c("subject_id","outcome")])
+  subject.outcome$permuted.outcome <- sample(subject.outcome$outcome,nrow(subject.outcome))
+  selected.cytokine.profiles.permute$outcome <- subject.outcome[match(selected.cytokine.profiles.permute$subject_id,subject.outcome$subject_id),
+                                                                "permuted.outcome"]
+  
+  res <- juncture.divergent.proteins(selected.cytokine.profiles.permute)
+  return(res)
+},mc.cores=num.workers)
+
+type1.protein.freq <- do.call("rbind",lapply(protein.search.res.permuted,function(x){x$type1}))
+cat("Protein permutation p-value:\n")
+table(type1.protein.freq$cytokine)/num.perm
+
+```
+
+### Session Info
+```{r save}
+parallel::stopCluster(cl)
+# save all results
+dir.create(file.path(output.folder,"critical.juncture"))
+save(protein.search.res.permuted,
+     file = file.path(output.folder,"critical.juncture","deceased.v.recovered.cytokine.test.permutation.results.RData"))
+
+sessionInfo()
+```

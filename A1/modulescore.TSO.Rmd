@@ -1,0 +1,204 @@
+---
+title: "Geneset enrichment score time trajectory plots"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(matrixStats)
+library(plyr)
+library(tidyverse)
+library(ggplot2)
+library(limma)
+library(edgeR)
+library(GSVA)
+library(Biobase)
+library(reshape2)
+source("util_fun/plot.gsva.score.TSO.R")
+```
+
+
+## Geneset enrichment gsva score with TSO
+**Generate Figure 3 D; Figure 4 J,K; Figure 6 E; Figure S3 D**  
+Scores were calculated based on LE genes for each comparison group (see score generation scripts)  
+```{r input}
+### use the score of LE
+# input is the files from output folder of sample_gsva_dftoelist.R
+PC1_onset_union_gsva_esetlist <- readRDS("output/module_score_gsva/union_PC1_days_since_onset_module_score_gsva_filtered_samples_genes_esetlist.rds")
+
+PC1mid_gsva_esetlist <- readRDS("output/module_score_gsva/PC1High-low_in_mid_module_score_gsva_filtered_samples_genes_esetlist.rds")
+
+```
+  
+  
+```{r utility funs}
+# plot time since onset geneset enrichment score
+plot_onset_module_score_line <- function(input_gsva_esetlist, 
+                                         LE_score_used = "GSVA PC1 LE score",
+                                         fig_out_pdf = "modulescore_time_allcelltype.pdf", 
+                                         celltype = celltypes,
+                                         width = 8.5, height = 6.5) {
+  p <- list()
+  pdf(paste(FIG_OUT_PATH,fig_out_pdf,sep = ""), width = width, height = height)
+  for(cell in celltype){
+    if(grepl("dblt", cell, ignore.case = T) | cell == "gated_out" | cell == "Unknown"){
+      next()
+    }
+    # print(cell)
+    eset <- input_gsva_esetlist[[cell]]
+    dat <- t(exprs(eset))
+    dat <- as.data.frame(dat) %>% select(intersect(combined_genesets, colnames(dat)))
+    if(nrow(dat) < 7){
+      next()
+    }
+    
+    dat$days_since_onset <- eset$days_since_onset
+    dat$pc1_group <- eset$PC1_cat
+    dat$Subject <- eset$Subject
+    dat$severity_outcome <- eset$severity.outcome2
+    
+    dat <- dat %>% 
+      gather(key = module, value = score, 
+             -c(days_since_onset, pc1_group, severity_outcome, Subject)) %>%
+      filter(!is.na(pc1_group))
+    
+    tmp.HC <- filter(dat, pc1_group == "HC" & Subject != "CHI014")
+    means <- tmp.HC %>% dplyr::group_by(module) %>% 
+      dplyr::summarise(median = median(score),
+                       quantile.25 = quantile(score, .25, na.rm = TRUE),
+                       quantile.75 = quantile(score, .75, na.rm = TRUE))
+    
+    tmp.covid <- filter(dat, pc1_group %in% c("PC1_low", "PC1_high"))
+    severity.color <- c("Critical-Alive"="#374E55FF","Critical-Deceased"="#DF8F44FF","Moderate-Alive"="#00A1D5FF" ,"Severe-Alive"="#B24745FF","HC" = "#79AF97FF")
+    p1 <- ggplot(tmp.covid, aes(x = days_since_onset, y = score)) + 
+      # geom_rect(aes(xmin = 17, xmax = 23, ymin = -Inf, ymax = Inf), fill = "#EADCFA", alpha = 0.1)+
+      geom_point(alpha=.4,shape=21,aes(fill=pc1_group),size=2) + 
+      scale_fill_manual(name="Severity",values = c("deepskyblue1","red")) +
+      geom_line(aes(group = Subject), alpha = 0.1)+
+      ggtitle(paste(cell, LE_score_used, sep = " ")) + 
+      scale_color_manual(name="PC1 Class",values=c("deepskyblue1","red")) +
+      geom_smooth(se = T,aes(color=pc1_group),alpha=0.1) + 
+      geom_hline(aes(yintercept = median), data = means, alpha = 0.7, linetype = "dashed", color = "#00BA38")+
+      facet_wrap(~module, scales = "free", ncol = 4) +
+      geom_vline(xintercept = 20, color = "grey60", linetype='dashed') +
+      theme_bw()
+    print(p1)
+    p[[cell]] <- p1
+  }
+  dev.off()
+  return(p)
+}
+
+# functions for highlight the TSO d17-23 period
+plot_onset_module_score_highlight <- function(input_gsva_esetlist, LE_score_used = "GSVA PC1 LE score",
+                                    fig_out_pdf = "modulescore_time_allcelltype.pdf", 
+                                    celltype = celltypes,
+                                    width = 8.5, height = 6.5) {
+  p <- list()
+  pdf(paste(FIG_OUT_PATH,fig_out_pdf,sep = ""), width = width, height = height)
+  for(cell in celltype){
+    if(grepl("dblt", cell, ignore.case = T) | cell == "gated_out" | cell == "Unknown"){
+      next()
+    }
+    # print(cell)
+    eset <- input_gsva_esetlist[[cell]]
+    dat <- t(exprs(eset))
+    dat <- as.data.frame(dat) %>% select(intersect(combined_genesets, colnames(dat)))
+    if(nrow(dat) < 7){
+      next()
+    }
+    
+    dat$days_since_onset <- eset$days_since_onset
+    dat$pc1_group <- eset$PC1_cat
+    dat$Subject <- eset$Subject
+    dat$severity_outcome <- eset$severity.outcome2
+    
+    dat <- dat %>% 
+      gather(key = module, value = score, 
+             -c(days_since_onset, pc1_group, severity_outcome, Subject)) %>%
+      filter(!is.na(pc1_group))
+    
+    tmp.HC <- filter(dat, pc1_group == "HC" & Subject != "CHI014")
+    means <- tmp.HC %>% dplyr::group_by(module) %>% 
+      dplyr::summarise(median = median(score),
+                       quantile.25 = quantile(score, .25, na.rm = TRUE),
+                       quantile.75 = quantile(score, .75, na.rm = TRUE))
+    
+    tmp.covid <- filter(dat, pc1_group %in% c("PC1_low", "PC1_high"))
+    severity.color <- c("Critical-Alive"="#374E55FF","Critical-Deceased"="#DF8F44FF","Moderate-Alive"="#00A1D5FF" ,"Severe-Alive"="#B24745FF","HC" = "#79AF97FF")
+    p1 <- ggplot(tmp.covid, aes(x = days_since_onset, y = score)) + 
+      geom_rect(aes(xmin = 17, xmax = 23, ymin = -Inf, ymax = Inf), fill = "#EADCFA", alpha = 0.1)+
+      geom_point(alpha=.4,shape=21,aes(fill=pc1_group),size=2) + 
+      scale_fill_manual(name="Severity",values = c("deepskyblue1","red")) +
+      geom_line(aes(group = Subject), alpha = 0.1)+
+      ggtitle(paste(cell, LE_score_used, sep = " ")) + 
+      scale_color_manual(name="PC1 Class",values=c("deepskyblue1","red")) +
+      geom_smooth(se = T,aes(color=pc1_group),alpha=0.1) + 
+      geom_hline(aes(yintercept = median), data = means, alpha = 0.7, linetype = "dashed", color = "#00BA38")+
+      facet_wrap(~module, scales = "free", ncol = 4) +
+      # geom_vline(xintercept = 20, color = "grey60", linetype='dashed') +
+      theme_bw()
+    print(p1)
+    p[[cell]] <- p1
+  }
+  dev.off()
+  return(p)
+}
+
+```
+  
+  
+set interested pathways to plot
+```{r, include=FALSE}
+dir.create("output/Module_score_time")
+FIG_OUT_PATH <- "output/Module_score_time/"
+
+combined_genesets <- c("reactome_Fatty acid metabolism",
+                       "Ginsburg_Flu(2013)",
+                       "GO_RESPONSE_TO_TYPE_I_INTERFERON",
+                       "HALLMARK_TNFA_SIGNALING_VIA_NFKB", 
+                       "GO_CELLULAR_RESPONSE_TO_INTERLEUKIN_1",
+                       "reactome_Translation", 
+                       "KEGG_RIBOSOME")
+
+```
+  
+
+### using gsva score from union LE of PC1 and TSO to show the effect of severity and time
+```{r, fig.width=10.5, fig.height=5}
+celltypes <- names(PC1_onset_union_gsva_esetlist)
+
+p <- plot_onset_module_score_line(PC1_onset_union_gsva_esetlist, 
+                             LE_score_used = "GSVA PC1 days_onset union LE score", 
+                             fig_out_pdf = "modulescore_time_allcelltype_PC1_onsetunionLE.pdf", 
+                             width = 10.5, height = 5)
+p$Mono_Classical
+p$NK_CD16hi
+```
+
+
+### using gsva score from LE of mid(d17-23 juncture) PC1high vs low comparison
+highlight the difference at d17-23 juncture
+```{r, fig.width=6, fig.height=2.5}
+combined_genesets <- c("HALLMARK_TNFA_SIGNALING_VIA_NFKB", 
+                       "HALLMARK_INFLAMMATORY_RESPONSE")
+
+celltypes <- names(PC1mid_gsva_esetlist)
+
+p <- plot_onset_module_score_highlight(PC1mid_gsva_esetlist, 
+                                  LE_score_used = "GSVA PC1_at_mid LE score", 
+                                  celltype = celltypes, 
+                                  fig_out_pdf = "modulescore_time_allcelltype_PC1midLE.pdf", 
+                                  width = 5, height = 2.5)
+
+p$Mono_Classical
+p$NK_CD16hi
+```
+
+
+```{r}
+sI <- sessionInfo()
+utils:::print.sessionInfo(sI[-c(10,11)])
+```
+

@@ -1,0 +1,143 @@
+---
+title: "cell freq stat"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(Seurat) #load Seurat 3.1
+library(matrixStats)
+library(plyr)
+library(tidyverse)
+library(openxlsx)
+library(reshape2)
+library(ComplexHeatmap)
+library(circlize)
+source("util_fun/cellfreq.funs.R")
+```
+  
+
+## plot cell frequency of unsorted CITEseq data
+**Generate Figure 6A; Figure S2A, S2B, S2C**   
+
+### Take interested populations from statistical model test and plot together
+**set1 as days_since_onset, set2 as PC1class, set3 for heatmap**  
+
+```{r input}
+main_set1 = c("B_Mem_IgMneg", "B_CD71_gated",
+              "CD8_Mem_Activated","NK","Mono_Classical", 
+              "Mono_Classical_CD163hi", "Mono_NonClassical")
+sup_set1 = c("Plasmablast_gated", "PB_Plasmablasts_MHCIhi", 
+             "CD4_Mem_CM", "CD4_Mem_CD69pos", "Tfh_gated", "Treg_gated",
+             "CD8_Mem_NKT", "CD8_Mem_EM.TE", "CD8_Naive_KLRG1pos ", "gammadeltaT", 
+             "NK_CD56loCD16lo", "Mono", "cDC", "pDC", "Platelets")
+main_set2 = c("CD4_Mem_CM", "CD8_Mem_CM.TM", 
+              "gammadeltaT","MAIT","Mono_NonClassical", "pDC", "cDC", "Platelets")
+sup_set2 = c( "B_Mem_CD11cpos", "B_CD71_gated", "Plasmablast_gated",
+              "PB_Plasmablasts_MHCIhi","CD4_Mem", "CD4_Naive",
+              "CD4_Mem_Activated.CD38.CD278hi", "Tfh_gated", "Treg_gated", 
+              "CD8_Mem", "CD8_Mem_Activated", "gammadeltaT_CD158e1hi",
+              "Mono_Classical_IgPos", "Mono_Classical_CD163hi")
+
+# read final list data in
+final_cell_freq_UnSort_mtx <- read.csv("input/final_full_cell_freq_UnSort_mtx.20200818.csv",
+                                       header = TRUE, row.names = 1, check.names = FALSE)
+colnames(final_cell_freq_UnSort_mtx) <- str_replace(colnames(final_cell_freq_UnSort_mtx), 
+                                                    pattern = "_to_parent", replacement = "")
+final_cell_freq_UnSort_mtx$PC1class <- factor(final_cell_freq_UnSort_mtx$PC1class, levels = c("HC","PC1_low","PC1_high"))
+# remove technical controls
+final_cell_freq_UnSort_mtx <- final_cell_freq_UnSort_mtx %>% filter(Subject != "CHI014")
+```
+  
+
+### set1 Fig6
+```{r, fig.width=7.5, fig.height=5}
+final_cell_freq_UnSort_mtx_main_set1 <- select(final_cell_freq_UnSort_mtx, all_of(main_set1),
+                                               colnames(final_cell_freq_UnSort_mtx)[1:10])
+final_cell_freq_UnSort_main_set1 <- final_cell_freq_UnSort_mtx_main_set1 %>% 
+  melt(id = c("Var1", "Timepoint", "sample_id", "Batch", "severity", 
+              "days_since_symptoms_onset","PC1","PC1class","Subject","severity_outcome")) 
+
+p <- plot5cat(final_cell_freq_UnSort_main_set1, "Fig6.main", "all.set1", width = 7.5, height = 5)
+# plot timecourse here
+p[[3]]
+```
+  
+  
+### set2 Fig2S
+```{r, fig.width=8.6, fig.height=5}
+final_cell_freq_UnSort_mtx_main_set2 <- select(final_cell_freq_UnSort_mtx, all_of(main_set2),
+                                               colnames(final_cell_freq_UnSort_mtx)[1:10])
+final_cell_freq_UnSort_main_set2 <- final_cell_freq_UnSort_mtx_main_set2 %>% 
+  melt(id = c("Var1", "Timepoint", "sample_id", "Batch", "severity", 
+              "days_since_symptoms_onset","PC1","PC1class","Subject","severity_outcome")) 
+
+p <- plot5cat(final_cell_freq_UnSort_main_set2, "Fig2.main", "all.set2", width = 7, height = 5)
+# plot PC1/DSM group here
+p[[4]]
+```
+  
+  
+### heatmap of cell subsets
+```{r, fig.width=10, fig.height=6.5}
+# removed 3-"CD4_Mem_Activated.CD38.CD278hi", 34-"Tcell, 31-"DPT", 33 - "Granulocytes", 26 - "RBC" which are too small or batch specific
+main_set3 = unique(c(main_set1, main_set2, "Mono_NonClassical", "B_Naive", "Mono_Classical",
+                     "NK_CD16hi","B_Mem","gammadeltaT","NK_CD56loCD16lo","Treg",
+                     "CD4_Mem","CD8_Mem","CD8_Naive","CD4_Naive","MAIT","pDC","cDC",
+                     "TissueResMemT","Platelets","NK_CD56hiCD16lo","DNT",
+                     "CD4", "CD8","CD19","NK","Mono","TCRVbeta13.1pos","Mono_Intermediate",
+                     "B_CD71_gated", "Plasmablast_gated", "Tfh_gated", 
+                     "Treg_gated", "B_Mem_CD11cpos"))
+fig2_cells <- select(final_cell_freq_UnSort_mtx, colnames(final_cell_freq_UnSort_mtx)[1:10],
+                     intersect(main_set3, colnames(final_cell_freq_UnSort_mtx)))
+
+fig2_cells_PC1 <- fig2_cells %>% filter(!is.na(PC1class), Timepoint %in% c("HC","T0"))
+fig2_cells_PC1_mtx <- fig2_cells_PC1 %>% 
+ mutate(PC1class = factor(PC1class, levels = c("HC", "PC1_low", "PC1_high"))) %>%
+ arrange(PC1class, PC1) %>%
+ select(-c("TCRVbeta13.1pos", "Treg"))
+
+# change column names -- set HC
+fig2_cells_PC1_mtx_hm <- t(fig2_cells_PC1_mtx[,c(11:ncol(fig2_cells_PC1_mtx))])
+colnames(fig2_cells_PC1_mtx_hm) <- replace(as.character(fig2_cells_PC1_mtx$Subject), 
+                                           fig2_cells_PC1_mtx$Timepoint == "HC" & fig2_cells_PC1_mtx$Subject != "CHI014", paste("HC", seq_along(1:13), sep = ""))
+fig2_cells_PC1_mtx$colgroup = as.character(fig2_cells_PC1_mtx$PC1class)
+
+fig2_cells_PC1_mtx$colgroup = factor(fig2_cells_PC1_mtx$colgroup, levels = c("HC", "PC1_low", "PC1_high"))
+
+# use complexheatmap
+severity.color <- c("Critical_Alive"="#374E55FF","Critical_Deceased"="#DF8F44FF","Moderate_Alive"="#00A1D5FF","Severe_Alive"="#B24745FF","HC_HC" = "#79AF97FF")
+PC1.color <- colorRamp2(c(-3, 3.6), c("white", "#e97171"))
+PC1class.color <- c("HC"="#00BA38", "PC1_low"="#619CFF", "PC1_high"="#F8766D")
+
+ha = HeatmapAnnotation(
+  PC1class = fig2_cells_PC1_mtx$PC1class,
+  PC1 = fig2_cells_PC1_mtx$PC1, 
+  severity_outcome = factor(fig2_cells_PC1_mtx$severity_outcome, 
+                            levels = c("HC_HC", "Moderate_Alive", "Severe_Alive", "Critical_Alive", "Critical_Deceased")),
+  col = list(PC1 = PC1.color,
+             PC1class = PC1class.color,
+             severity_outcome = severity.color)
+)
+
+
+# pdf("output/Fig2.celltypecor.cluster.pdf", width = 10, height = 6.5)
+Heatmap(pheatmap:::scale_rows(fig2_cells_PC1_mtx_hm), name = "cell_freq_zscore", 
+        show_column_names = TRUE, column_names_rot = 45,
+        top_annotation = ha, cluster_columns = FALSE,
+        column_split = fig2_cells_PC1_mtx$colgroup,
+        column_gap = unit(1.5, "mm"),
+        row_names_gp = gpar(fontsize = 10.5),
+        column_names_gp = gpar(fontsize = 8)
+)
+# dev.off()
+
+```
+
+```{r}
+sI <- sessionInfo()
+utils:::print.sessionInfo(sI[-c(10,11)])
+```
+
+

@@ -1,0 +1,72 @@
+---
+title: "NK cell Geneset enrichment scores correlation scatter -- Schulte-Schrepping et al, 2020, Cell"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(matrixStats)
+library(plyr)
+library(tidyverse)
+library(ggplot2)
+library(Biobase)
+library(reshape2)
+library(ggpubr)
+library(gridExtra)
+source("../util_fun/external.data.gsvascore.dfwmeta.R")
+```
+
+## Geneset enrichment gsva scores correlations -- Schulte-Schrepping et al
+**Generate Figure S4F**  
+
+```{r input}
+### scores were calculated based on LE genes for from severity comparison
+FIG_OUT_PATH <- "Schulte-Schrepping/output/"
+combined_genesets <- c("HALLMARK_TNFA_SIGNALING_VIA_NFKB", 
+                       "reactome_Fatty acid metabolism")
+
+severity_gsva_esetlist <- readRDS("../input/SchulteSchrepping/cohort1/severe-mild_module_score_gsva_filtered_samples_genes_cohort1.rds")
+severity_gsva_esetlist_df <- getgsvascore_list_df(severity_gsva_esetlist, combined_genesets)
+severity_gsva_esetlist_df_T0 <- severity_gsva_esetlist_df %>% filter(Timepoint == "T0", celltype == "15_NK cells")
+
+severity_gsva_esetlist_cohort2 <- readRDS("../input/SchulteSchrepping/cohort2/severe-mild_module_score_gsva_filtered_samples_genes_cohort2.rds")
+severity_gsva_esetlist_cohort2_df <- getgsvascore_list_df(severity_gsva_esetlist_cohort2, combined_genesets)
+severity_gsva_esetlist_cohort2_df_T0 <- severity_gsva_esetlist_cohort2_df %>% filter(Timepoint == "T0", celltype == "NK cells")
+```
+  
+
+### cohort1
+```{r, fig.width=4, fig.height=3}
+# cohort1 plot
+severity.color <- c("mild"="#00A1D5FF" ,"severe"="#B24745FF", "control" = "#79AF97FF")
+p <- ggplot(severity_gsva_esetlist_df_T0, aes(x = HALLMARK_TNFA_SIGNALING_VIA_NFKB, y = `reactome_Fatty acid metabolism`)) + 
+  geom_point(shape=21,aes(fill=group_per_sample),size=3, color="white") + 
+  scale_fill_manual(name="Severity",values = severity.color) +
+  geom_smooth(se = F,method = "lm") + 
+  stat_cor(method = "pearson") +
+  facet_wrap(~celltype, scales = "free") +
+  theme_bw()
+
+p
+# ggsave("../SchulteSchrepping/output/", filename = "NK.NFkBvsfatty.severity.cor.pdf", plot = p, device = "pdf", width = 4, height = 3)
+```
+  
+  
+### cohort2
+```{r, fig.width=4, fig.height=3}
+# cohort2 plot
+p <- ggplot(severity_gsva_esetlist_cohort2_df_T0, aes(x = HALLMARK_TNFA_SIGNALING_VIA_NFKB, y = `reactome_Fatty acid metabolism`)) + 
+  geom_point(shape=21,aes(fill=group_per_sample),size=3, color="white") + 
+  scale_fill_manual(name="Severity",values = severity.color) +
+  geom_smooth(se = F,method = "lm") + 
+  stat_cor(method = "pearson") +
+  facet_wrap(~celltype, scales = "free") +
+  theme_bw()
+
+p
+# ggsave("../SchulteSchrepping/output/", filename = "NK.NFkBvsfatty.severity.cor.cohort2.pdf", plot = p, device = "pdf", width = 4, height = 3)
+
+```
+
+  

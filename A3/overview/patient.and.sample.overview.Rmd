@@ -1,0 +1,129 @@
+---
+title: "Overview of COVID patients"
+output: 
+  html_document:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+  
+Sample collection timeline and treatment info for the 33 citeseq patients.
+```{r setup, include=FALSE}
+data.folder <- "input.data"
+library(knitr)
+library(ggplot2)
+library(ggsci)
+library(ggpubr)
+library(ggfortify)
+library(Hmisc)
+library(GGally)
+library(plsRglm)
+knitr::opts_chunk$set(echo = TRUE)
+options(stringsAsFactors = FALSE)
+opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+
+load(file.path(data.folder,"covid19.metadata.paper1.RData"),verbose = T)
+```
+
+### Overview
+```{r overiew,fig.cap=c("Fig 1A","Fig S1"),fig.height=10,out.width=800}
+batch.subjects <- unique(subset(covid19.samples,!is.na(batch))$subject_id)
+batch.samples <- subset(covid19.samples,material_type == "PBMC" & subject_id %in% batch.subjects)
+batch.samples <- batch.samples[order(batch.samples$days_from_admission_to_sample_drawn),]
+batch.samples$severity.outcome <- paste0(batch.samples$severity,"-",batch.samples$outcome)
+severity.color <- ggsci::pal_jama()(length(unique(batch.samples$severity.outcome)))
+names(severity.color) <- sort(unique(batch.samples$severity.outcome))
+
+# plot timeline of all batch PBMC samples
+patients.without.symptom.onset <- unique(subset(batch.samples,is.na(days_from_symptom_onset_to_sample_drawn))$subject_id)
+# replace NA with 0
+batch.samples[is.na(batch.samples$days_from_symptom_onset_to_sample_drawn),"days_from_symptom_onset_to_sample_drawn"] <- 
+  batch.samples[is.na(batch.samples$days_from_symptom_onset_to_sample_drawn),"days_from_admission_to_sample_drawn"] 
+batch.samples[is.na(batch.samples$days_from_symptom_onset_to_hospitalization),"days_from_symptom_onset_to_hospitalization"] <- 0
+batch.samples[is.na(batch.samples$number_of_days_hospitalized),"number_of_days_hospitalized"] <- 
+  batch.samples[is.na(batch.samples$number_of_days_hospitalized),"days_from_hospitalization_to_death"]
+batch.samples <- batch.samples[order(batch.samples$days_from_symptom_onset_to_hospitalization,decreasing = F),]
+batch.subject.ordered.by.admission <- batch.samples[,c("subject_id","age","sex")]
+batch.subject.ordered.by.admission <- batch.subject.ordered.by.admission[!duplicated(batch.subject.ordered.by.admission$subject_id),]
+#batch.subject.ordered.by.admission$subject_id_alt <- paste0("Pt",sprintf("%02d",1:nrow(batch.subject.ordered.by.admission))," (",
+#                                                            batch.subject.ordered.by.admission$age,batch.subject.ordered.by.admission$sex,")")
+batch.subject.ordered.by.admission$subject_id_alt <- paste0(gsub("^HGR0000","P",batch.subject.ordered.by.admission$subject_id)," (",
+                                                            batch.subject.ordered.by.admission$age,batch.subject.ordered.by.admission$sex,")")
+rownames(batch.subject.ordered.by.admission) <- batch.subject.ordered.by.admission$subject_id
+batch.subject.ordered.by.admission$subject_id_alt <- factor(batch.subject.ordered.by.admission$subject_id_alt,
+                                                            levels = rev(batch.subject.ordered.by.admission$subject_id_alt))
+
+batch.samples$subject_id_alt <- batch.subject.ordered.by.admission[batch.samples$subject_id,"subject_id_alt"]
+
+# move T1 to T0 for those without T0
+#batch.samples[batch.samples$subject_id %in% setdiff(batch.subjects,subset(batch.samples,visit == "T0")$subject_id),"visit"] <- "T0"
+# subjects whose first sample was >= 30 days since symptom onset
+late.subjects <- batch.samples[!duplicated(batch.samples$subject_id) & batch.samples$days_from_symptom_onset_to_sample_drawn >= 30,"subject_id_alt"]
+ggplot(batch.samples,aes(subject_id_alt,days_from_symptom_onset_to_sample_drawn,label=visit)) + 
+  geom_vline(xintercept = batch.subject.ordered.by.admission[patients.without.symptom.onset,"subject_id_alt"],size=4,color="#66a182",alpha=0.3) +
+  geom_vline(xintercept = late.subjects,size=4,color="grey90",alpha=0.75) +
+  geom_hline(yintercept = 0,linetype="dashed",color="red") + 
+  geom_rect(size=2,alpha=0.5,fill="white",aes(color=severity.outcome,xmin=subject_id_alt,xmax=subject_id_alt,
+                ymin=days_from_symptom_onset_to_hospitalization,ymax=days_from_symptom_onset_to_hospitalization + number_of_days_hospitalized)) + 
+  geom_label(data=subset(batch.samples,!is.na(batch)),size=1.5,fontface="bold",color="white",aes(fill=visit),label.padding = unit(.15,"lines")) +
+  geom_label(data=subset(batch.samples,is.na(batch)),size=1.5,fontface="bold",aes(fill=visit,alpha=.9),label.padding = unit(.15,"lines")) +
+  coord_flip() + theme_bw() + scale_fill_npg(name="Time Point",guide=guide_legend(title.position = "top")) +
+  scale_color_jama(name="Severity",guide=guide_legend(title.position = "top")) + 
+  scale_alpha_continuous(name="QC",labels=c("Excluded"),range = c(.9,1),guide=guide_legend(title.position = "top")) +
+  ylab("Days since Symptom Onset") + xlab("") + #ggtitle("Sample Collection Timeline") + 
+  theme(text=element_text(size=10),legend.position = "bottom",legend.box = "vertical",legend.text = element_text(size=6))
+
+# treatment
+selected.treatment <- subset(covid19.treatment,subject_id %in% batch.samples$subject_id)
+# add earliest sample time points
+selected.treatment <- merge(selected.treatment,batch.samples[!duplicated(batch.samples$subject_id),
+                                                             c("subject_id","days_from_admission_to_sample_drawn","severity.outcome")],by="subject_id")
+selected.treatment$days_between_admission_and_earliest_sample <- selected.treatment$days_from_admission_to_sample_drawn
+# fill in missing values
+selected.treatment$missing.dates <- is.na(selected.treatment$days_from_admission_to_treatment_start) |
+  is.na(selected.treatment$days_from_admission_to_treatment_end)
+y.min <- as.numeric(min(c(-selected.treatment$days_from_symptom_onset_to_hospitalization,selected.treatment$days_from_admission_to_treatment_start),na.rm = T))
+selected.treatment[is.na(selected.treatment$days_from_admission_to_treatment_start),"days_from_admission_to_treatment_start"] <- y.min
+y.max <- as.numeric(max(c(selected.treatment$days_between_admission_and_earliest_sample,selected.treatment$days_from_admission_to_treatment_end),na.rm = T))
+selected.treatment[is.na(selected.treatment$days_from_admission_to_treatment_end),"days_from_admission_to_treatment_end"] <- y.max
+
+selected.treatment$treatment_id <- 1:nrow(selected.treatment)
+selected.treatment <- reshape2::melt(selected.treatment,measure.vars = c("days_from_admission_to_treatment_start","days_from_admission_to_treatment_end"))
+
+selected.treatment$subject_id_alt <- factor(batch.subject.ordered.by.admission[selected.treatment$subject_id,"subject_id_alt"],
+                                            levels=batch.subject.ordered.by.admission$subject_id_alt)
+
+# convert rare categories to Others
+selected.treatment[selected.treatment$treatment_category %in% c("Heart Medications","Neuro Drugs","Antifungal Therapy"),"treatment_category"] <- "Other" 
+selected.treatment$subject_id_alt <- as.character(selected.treatment$subject_id_alt)
+selected.treatment <- unique(selected.treatment[,-grep("treatment_notes",colnames(selected.treatment))]) # avoid duplicates
+selected.treatment <- selected.treatment[grep("Mask",selected.treatment$treatment_label,invert = T),]
+selected.treatment$treatment_category <- factor(selected.treatment$treatment_category,
+                                                levels = c(sort(setdiff(unique(selected.treatment$treatment_category),"Other")),"Other"))
+selected.treatment$treatment_category_label <- paste0(as.numeric(selected.treatment$treatment_category),": ",selected.treatment$treatment_label)
+selected.treatment$treatment_category <- paste0(as.numeric(selected.treatment$treatment_category),". ",selected.treatment$treatment_category)
+
+# color subjects by severity group
+subject.color <- unique(selected.treatment[,c("subject_id_alt","severity.outcome")])
+subject.color <- severity.color[subject.color$severity.outcome]
+
+ggplot(selected.treatment,
+       aes(y=value,x=subject_id_alt,color=treatment_category_label,shape=outcome,fill=severity.outcome)) + 
+  geom_hline(yintercept = 0,color="grey60",linetype="dotted") +
+  geom_line(data=subset(selected.treatment,missing.dates==T),alpha=0.5,position = position_dodge(width=0.75),size=1,linetype="dashed") + 
+  geom_line(data=subset(selected.treatment,missing.dates==F),size=2,alpha=0.75,position = position_dodge(width=0.75)) + 
+  geom_point(aes(y=days_between_admission_and_earliest_sample),color="black",pch=21,alpha=0.8,fill=NA) +
+  geom_point(aes(y=-days_from_symptom_onset_to_hospitalization),color="black",alpha=0.8) +
+  geom_point(aes(y=-days_from_symptom_onset_to_hospitalization),color="black",alpha=0.8,pch=16) + # just to cover the colors
+  facet_grid(~treatment_category) + theme_bw() + coord_flip() + ylab("Days from Admission") + xlab("") + ggtitle("Subject Treatment Timeline") +
+  scale_fill_manual(name="Severity",values=severity.color,guide=guide_legend(override.aes = list(fill=severity.color,shape=22,color="white",size=4))) +
+  scale_shape_manual(name="Time Point",values=c(16,21),labels=c("Symptom Onset","1st Sample")) + 
+  theme(legend.position = "bottom",legend.box = "vertical",axis.text.y=element_text(color=subject.color),text=element_text(size=8)) + 
+  scale_color_manual(name="",values=rep(ggsci::pal_d3()(10),5))
+```
+
+### Session Info
+```{r}
+sessionInfo()
+```

@@ -1,0 +1,136 @@
+---
+title: "Antigen presentation enrichment score and HLA gene expression"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(matrixStats)
+library(plyr)
+library(tidyverse)
+library(ggplot2)
+library(Biobase)
+library(reshape2)
+library(ggpubr)
+library(gridExtra)
+source("util_fun/gsvascore.dfwmeta.R")
+```
+
+## Antigen presentation enrichment score correlation with IFN/inflammatory genesets scores
+** Generate Supplemental Note Figure C,D**
+looking at the geneset enrichment score with different disease severity, and the correlation with other IFN/inflammatory pathways, so using PC1/DSM LE scores
+```{r input, include=FALSE}
+# score correlates T0 only
+# input is the files from output folder of output from sample_gsva_dftoelist.R
+PC1_gsva_esetlist <- readRDS("pbulk/module_score_gsva/PC1_PC1_module_score_gsva_filtered_samples_genes_esetlist.rds")
+
+combined_genesets <- c("HALLMARK_TNFA_SIGNALING_VIA_NFKB", 
+                       "HALLMARK_INFLAMMATORY_RESPONSE",
+                       "KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION",
+                       "GO_RESPONSE_TO_TYPE_I_INTERFERON")
+```
+  
+  
+```{r fun, include=FALSE}
+# ploting function
+# plot antigen presentation enrichment score vs inflammatory genesets scores
+plot5pathways <- function(gsvascore_list_df, LE_score = "alltimepoints_LE", width = 12, height = 10){
+  pdf(paste(FIG_OUT_PATH, "modulescore_cor_", LE_score, "_inflamvsAg.pdf", sep = ""), width = width, height = height)
+  severity.color <- c("Critical-Alive"="#374E55FF","Critical-Deceased"="#DF8F44FF","Moderate-Alive"="#00A1D5FF" ,"Severe-Alive"="#B24745FF","HC" = "#79AF97FF")
+  p1 <- ggplot(gsvascore_list_df, aes(x = `HALLMARK_TNFA_SIGNALING_VIA_NFKB`, y = `KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION`)) + 
+    geom_point(alpha=.4,shape=21,aes(fill=pc1_group),size=2) + 
+    scale_fill_manual(name="Severity",values = c("deepskyblue1","red")) +
+    ggtitle(paste("GSVA", LE_score, "NFkbvsAgPresentation", sep = " ")) + 
+    scale_color_manual(name="PC1 Class",values=c("deepskyblue1","red")) +
+    geom_smooth(se = T,aes(color=pc1_group),alpha=0.15,method = "lm") + 
+    stat_cor(aes(color = pc1_group), method = "pearson") +
+    facet_wrap(~celltype, scales = "free") +
+    theme_bw()
+  print(p1)
+  
+  
+  p2 <- ggplot(gsvascore_list_df, aes(x = `HALLMARK_INFLAMMATORY_RESPONSE`, y = `KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION`)) + 
+    geom_point(alpha=.4,shape=21,aes(fill=pc1_group),size=2) + 
+    scale_fill_manual(name="Severity",values = c("deepskyblue1","red")) +
+    ggtitle(paste("GSVA", LE_score, "inflammatoryvsAgPresentation", sep = " ")) + 
+    scale_color_manual(name="PC1 Class",values=c("deepskyblue1","red")) +
+    geom_smooth(se = T,aes(color=pc1_group),alpha=0.15,method = "lm") + 
+    stat_cor(aes(color = pc1_group), method = "pearson") +
+    facet_wrap(~celltype, scales = "free") +
+    theme_bw()
+  print(p2)
+  
+  p3 <- ggplot(gsvascore_list_df, aes(x = `GO_RESPONSE_TO_TYPE_I_INTERFERON`, y = `KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION`)) + 
+    geom_point(alpha=.4,shape=21,aes(fill=pc1_group),size=2) + 
+    scale_fill_manual(name="Severity",values = c("deepskyblue1","red")) +
+    ggtitle(paste("GSVA", LE_score, "IFNvsAgPresentation", sep = " ")) + 
+    scale_color_manual(name="PC1 Class",values=c("deepskyblue1","red")) +
+    stat_cor(aes(color = pc1_group), method = "pearson") +
+    geom_smooth(se = T,aes(color=pc1_group),alpha=0.15,method = "lm") + 
+    facet_wrap(~celltype, scales = "free") +
+    theme_bw()
+  print(p3)
+  dev.off()
+}
+
+
+# plot gene expression/surface marker expression with PC1 boxplot
+plot_PC1class <- function(df, ylab){
+  df$celltype.sample <- paste(df$celltype, df$sample_id, sep = ".")
+  df_filtered <- filter(df, n_barcodes<=7)
+  jitter <- position_jitter(width = 0.2, height = 0.1)
+  df$cutoff <- df$celltype.sample %in% df_filtered$celltype.sample
+  p <- ggplot(df, aes(x = pc1_group, y = df[,ylab]))+
+    geom_boxplot(outlier.shape=NA, aes(color = pc1_group))+
+    geom_point(aes(shape = severity_outcome, group = 1, color = pc1_group, alpha = cutoff), position = jitter)+
+    scale_color_manual(name="PC1 Class",values=c("#00BA38", "#619CFF", "#F8766D"))+
+    scale_shape_manual(values = c("HC"=3, "Critical-Alive"=15, "Critical-Deceased"=16, "Moderate-Alive"=17, "Severe-Alive"=18))+
+    scale_alpha_manual(values = c(1,0))+
+    facet_wrap(~celltype, scales = "free_y")+
+    geom_point(data=df_filtered, aes(x=pc1_group, y=df_filtered[,ylab], shape = severity_outcome), color="grey", position = jitter)+
+    # scale_shape_manual(values = c("HC"=3, "Critical-Alive"=15, "Critical-Deceased"=16, "Moderate-Alive"=17, "Severe-Alive"=18))+
+    theme(axis.text.x = element_text(angle = 90))+
+    ylab(ylab)+
+    theme_bw()
+  return(p)
+}
+  
+
+
+```
+  
+  
+```{r}
+FIG_OUT_PATH <- "output/"
+PC1score_list_df <- getgsvascore_list_df(PC1_gsva_esetlist, combined_genesets)
+PC1t0score_list_df <- PC1score_list_df %>% filter(Timepoint == "T0",pc1_group %in% c("PC1_low", "PC1_high"))
+plot5pathways(PC1t0score_list_df, LE_score = "PC1_LE_T0") 
+
+```
+  
+  
+## HLA-DR and HLA-ABC surface expression in monocytes and DCs
+```{r}
+# input is the CITE pseudobulk data from output the output of generating pseudobulk objects
+cite_selected <- readRDS("output/CITE_pbulk/Unsorted-WCTcoursecelltype.rds")
+# parse cite eset meta data
+cite_selected <- lapply(cite_selected, function(dge){
+  dge@phenoData@data$PC1_cat <- as.character(dge@phenoData@data$PC1_cat)
+  dge@phenoData@data$PC1_cat <- replace(dge@phenoData@data$PC1_cat, 
+                                        dge@phenoData@data$Class == "HC", "HC")
+  dge@phenoData@data$PC1_cat <- factor(dge@phenoData@data$PC1_cat, levels = c("HC","PC1_low","PC1_high"))
+  dge@phenoData@data$severity.outcome2 <- as.character(dge@phenoData@data$severity.outcome2)
+  dge@phenoData@data$sample_id <- rownames(pData(dge))
+  dge <- dge
+})
+cite_markers <- c("HLA-DR","HLA-ABC")
+PC1score_wcite_df <- getgsvascore_list_df(cite_selected, combined_genesets = cite_markers)
+PC1t0score_wcite_df <- PC1score_wcite_df %>% filter(Timepoint %in%  c("T0","HC"), pc1_group %in% c("PC1_low", "PC1_high", "HC"))
+
+plot_PC1class(PC1t0score_wcite_df, ylab = "HLA-ABC")
+plot_PC1class(PC1t0score_wcite_df, ylab = "HLA-DR")
+```
+
+
+

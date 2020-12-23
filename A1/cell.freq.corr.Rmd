@@ -1,0 +1,73 @@
+---
+title: "compare flow and citeseq flowjo gating data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(Seurat) #load Seurat 3.1
+library(matrixStats)
+library(plyr)
+library(tidyverse)
+library(openxlsx)
+library(reshape2)
+library(ggpubr)
+source("util_fun/cellfreq.funs.R")
+```
+
+## compare flow and citeseq gate_group_merged data (independednt gated cell populations)
+** Generate Figure S2A **
+```{r input_cite}
+# get the Seurat object for gated cell subsets frequencies
+# merge <- readRDS("input/2020_08_09.rmBuffSHD8.allcelltypelabels.merge.SNG.wmeta.WithinBatchClustered.Rds")
+# merge.UnSort <- subset(merge, subset = Sorted == "N")
+
+# merge_cell_UnSort_gate_merged <- data.frame(table(merge.UnSort$sample_id, merge.UnSort$gate_group_merged)) %>% dplyr::group_by(Var1) %>% dplyr::mutate(ratio = Freq/sum(Freq))
+# saveRDS(merge_cell_UnSort_gate_merged, "output/merge_cell_UnSort_gate_merged.rds")
+
+# merge_cell_UnSort_course <- data.frame(table(merge.UnSort$sample_id, merge.UnSort$gate_group_course)) %>% 
+  # dplyr::group_by(Var1) %>% dplyr::mutate(ratio = Freq/sum(Freq))
+# saveRDS(merge_cell_UnSort_course, "output/merge_cell_UnSort_gate_course.rds")
+
+merge_cell_UnSort_gate_merged <- readRDS("output/merge_cell_UnSort_gate_merged.rds")
+merge_cell_UnSort_course <- readRDS("output/merge_cell_UnSort_gate_course.rds")
+merge_cell_UnSort <- rbind(merge_cell_UnSort_gate_merged, merge_cell_UnSort_course)
+```
+
+```{r input_flow, fig.width=12, fig.height=8}
+flow_of_total_mtx <- read.xlsx("input/Frequency_Manual.xlsx", sheet = "Freq_of_total", rowNames = TRUE)
+flow_of_total <- melt(flow_of_total_mtx, id = c("Subject", "Timepoint", "Class", "Assay")) %>%
+  mutate("sample_id" = paste(Subject, Timepoint, sep = "_"))
+
+merge_cell_UnSort$sample_id <- sapply(str_split(merge_cell_UnSort$Var1, pattern = "_", n = 2), function(x)x[[2]])
+
+flow_merge_cell_of_total <- inner_join(flow_of_total, merge_cell_UnSort, c("sample_id"="sample_id", "variable"="Var2")) %>%
+  mutate(value.y = 100*ratio) %>%
+  filter(!is.na(value.y)) %>%
+  mutate(variable = factor(variable, levels = c("B", "B_Naive", "B_Mem", 
+                                                "CD4", "CD4_Mem", "Treg", "Tfh",
+                                                "CD8", "CD8_Mem", "NK", "NK_CD16hi",
+                                                "NK_CD56hiCD16lo", "NK_CD56loCD16lo",
+                                                "Mono", "Mono_Classical", "Mono_Nonclassical",
+                                                "mDC", "pDC", "Gr", "Baso")))
+
+p <- ggplot(flow_merge_cell_of_total, aes(x = value, y = value.y))+
+  geom_point(aes(color = Class))+
+  facet_wrap(~variable, scales = "free")+
+  geom_smooth(method = lm, se=FALSE, linetype = "dashed")+
+  labs(title = "freq of total single cells",
+       x = "Flow_Cell_Freq%", y = "CITEseq_cell_Freq%")+
+  stat_cor(method = "pearson") +
+  theme_bw()
+p
+
+```
+
+
+```{r}
+sI <- sessionInfo()
+utils:::print.sessionInfo(sI[-c(10,11)])
+```
+
+ 

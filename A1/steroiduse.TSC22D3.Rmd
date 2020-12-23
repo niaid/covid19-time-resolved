@@ -1,0 +1,80 @@
+---
+title: "Corticosteroid use on TSC22D3 expression"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(matrixStats)
+library(plyr)
+library(tidyverse)
+library(ggplot2)
+library(Biobase)
+library(reshape2)
+# library(ggpubr)
+# library(rstatix)
+library(car)
+source("util_fun/gsvascore.dfwmeta.R")
+```
+
+## Test of exogenous corticosteroid use on TSC22D3 expression
+### plot TSC22D3 mRNA expression with steroid use
+**Generate Figure S5D**  
+
+```{r input}
+# input is the pseudobulk eset_list object
+eset_list <- readRDS("output/dge_lists/pbulk_eset_list_normalized_WCTcourse_metafiltered.rds")
+
+combined_genes <- c("TSC22D3")
+gene_avg_df <- getgsvascore_list_df(eset_list, combined_genesets = combined_genes)
+
+gene_avg_df_T0 <- gene_avg_df %>% 
+  rownames_to_column("sample") %>% 
+  filter(Timepoint %in% c("T0","HC"), pc1_group %in% c("HC", "PC1_low", "PC1_high")) %>%
+  filter(!str_detect(sample, "^CHI014")) %>%
+  filter(celltype %in% c("Mono_Classical", "NK_CD16hi"))
+gene_avg_df_T0$severity_outcome = as.character(gene_avg_df_T0$severity_outcome)
+gene_avg_df_T0$steroid.use = factor(gene_avg_df_T0$steroid.use, levels = c("HC", "FALSE", "TRUE"))
+```
+  
+  
+```{r, fig.width=7,fig.height=2.5}
+jitter <- position_jitter(width = 0.2, height = 0.1)
+# filter out low cell number samples not included in the test
+gene_avg_df_T0 <- filter(gene_avg_df_T0, n_barcodes>7)
+p <- ggplot(gene_avg_df_T0, aes(x = steroid.use, y = TSC22D3))+
+    geom_boxplot(outlier.shape=NA, aes(color = steroid.use))+
+    geom_point(aes(shape = severity_outcome, group = 1, color = steroid.use), position = jitter)+
+    scale_color_manual(name="steroid.use",values=c("#a2de96", "#3ca59d", "#e79c2a"))+
+    scale_shape_manual(values = c(15:16,3,17:18))+
+    facet_wrap(~celltype, scales = "free_y")+
+    theme(axis.text.x = element_text(angle = 90))+
+    theme_bw() 
+
+p
+# ggsave("output/TSC22D3.steroiduse.pdf", plot = p, device = "pdf", width = 7, height = 2.5)
+```
+  
+  
+Anova test of the effect of steroid use in COVID-19 patients accounting for severity(PC1/DSM), TSO, Age and experimental batch  
+
+```{r}
+gene_avg_df_T0_mono <- gene_avg_df_T0 %>% filter(celltype == "Mono_Classical") 
+gene_avg_df_T0_NK <- gene_avg_df_T0 %>% filter(celltype == "NK_CD16hi") 
+gene_avg_df_T0_mono_covid <- gene_avg_df_T0_mono %>% filter(steroid.use != "HC")
+gene_avg_df_T0_mono_stat <- car::Anova(aov(TSC22D3 ~ steroid.use+PC1+days_since_onset+Age+Batch, gene_avg_df_T0_mono_covid))
+gene_avg_df_T0_mono_stat
+
+
+gene_avg_df_T0_NK_covid <- gene_avg_df_T0_NK %>% filter(steroid.use != "HC")
+gene_avg_df_T0_NK_stat <- car::Anova(aov(TSC22D3 ~ steroid.use+PC1+days_since_onset+Age+Batch, gene_avg_df_T0_NK_covid))
+gene_avg_df_T0_NK_stat
+```
+
+
+```{r}
+sI <- sessionInfo()
+utils:::print.sessionInfo(sI[-c(10,11)])
+```
+

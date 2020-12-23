@@ -1,0 +1,168 @@
+---
+title: "Deceased v. Recovered Cytokine Profiles in Yale Dataset"
+output: 
+  html_document:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+  
+Using the Yale dataset as validation cohort, compare cytokine profiles between deceased patients and those with good outcome. 
+```{r setup, include=FALSE}
+yale.data.folder <- "input.data/external_studies/Yale_misfiring/"
+output.folder <- "output/critical.juncture"
+library(knitr)
+library(ggplot2)
+library(ggsci)
+library(ggpubr)
+library(ggrepel)
+library(ggfortify)
+library(mgcv)
+library(tidymv)
+library(lme4)
+library(lmerTest)
+knitr::opts_chunk$set(echo = TRUE)
+options(stringsAsFactors = FALSE)
+opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+```
+
+### Import Data
+Yale severity scores: 0 - Uninfected, 1 - hospitalization, 2 - low O2 supplement, 3 - Moderate O2 supplement, 4 - ICU, 5 - MV, 6 - Death
+LatestOutcome: 0 - still admitted, 1 - discharged, 2 - deceased, 3 - CMO/hospice
+```{r import}
+# yale
+cytokine.res.yale <- read.csv(file.path(yale.data.folder,"yale.data.csv"),na="NA")
+cytokine.res.yale$severity.outcome <- paste0(cytokine.res.yale$Clinical.score,"-",cytokine.res.yale$LatestOutcome)
+cytokine.res.yale$subject_id <- sapply(cytokine.res.yale$ID,function(x){unlist(strsplit(x,".",fixed = T))[1]})
+patient.max.severity <- aggregate(Clinical.score ~ subject_id,cytokine.res.yale,max)
+cat("Max subject severity score:\n")
+table(patient.max.severity$Clinical.score)
+cytokines <- colnames(cytokine.res.yale)[88:158]
+cat("Cytokines measured in the Yale dataset:\n")
+print(cytokines)
+```
+
+### Build subcohort
+Identify all deceased patients (including those in hospice), and match them with critical but recovered patients by age and gender.
+```{r subcohort}
+# patients that have died or in hospice
+deceased.patients <- unique(subset(cytokine.res.yale,LatestOutcome >= 2)$subject_id)
+recovered.patients <- subset(patient.max.severity,Clinical.score >= 4)$subject_id
+recovered.patients <- setdiff(recovered.patients,deceased.patients)
+patient.demo <- unique(cytokine.res.yale[,c("subject_id","Age","sex","LatestOutcome")])
+patient.demo <- subset(patient.demo,!is.na(Age) & Age != "")
+patient.demo$age.numeric <- as.numeric(patient.demo$Age)
+patient.demo[patient.demo$Age == "? 90","age.numeric"] <- 95
+rownames(patient.demo) <- patient.demo$subject_id
+
+age.buffer <- 3
+matched.recovered.patients <- list()
+for (i in deceased.patients) {
+  #cat("Target:\n")
+  #print(patient.demo[i,])
+  #cat("Matches:\n")
+  tmp <- subset(patient.demo,subject_id %in% recovered.patients & sex == patient.demo[i,"sex"] & 
+           age.numeric >= patient.demo[i,"age.numeric"] - age.buffer & age.numeric <= patient.demo[i,"age.numeric"] + age.buffer)# &
+             #subject_id %in% subset(cytokine.res.yale,DFSO <= 23)$subject_id)
+  #print(tmp)
+  matched.recovered.patients[[i]] <- tmp$subject_id
+}
+
+deceased.v.recovered.juncture <- subset(cytokine.res.yale,subject_id %in% c(deceased.patients,unlist(matched.recovered.patients)))# &
+                                         # Age != "? 90") # excluding age 90+ patients as they don't have matching recovered counterparts
+deceased.v.recovered.juncture$outcome <- "Alive"
+deceased.v.recovered.juncture$age.numeric <- as.numeric(deceased.v.recovered.juncture$Age)
+deceased.v.recovered.juncture[deceased.v.recovered.juncture$Age == "? 90","age.numeric"] <- 95
+deceased.v.recovered.juncture[deceased.v.recovered.juncture$subject_id %in% deceased.patients,"outcome"] <- "Deceased"
+# removing samples without any cytokine data
+deceased.v.recovered.juncture <- deceased.v.recovered.juncture[rowSums(is.na(deceased.v.recovered.juncture[,cytokines])) < 30,]
+
+cat("Deceased patients sampling timeline:\n")
+table(subset(deceased.v.recovered.juncture,outcome=="Deceased")[,c("subject_id","DFSO")])
+cat("Alive patients sampling timeline:\n")
+table(subset(deceased.v.recovered.juncture,outcome=="Alive")[,c("subject_id","DFSO")])
+```
+
+### Juncture Analysis
+Compare between deceased and recovered patients during critical juncture (between 17 and 23 days TSO) and check whether
+any of the cytokines had signficant shift entering the juncture
+```{r juncture,fig.cap="<b>Figure 1</b> PCA plot of samples from the deceased and recovered sub-cohort. Patient age shown in labels."}
+# PCA
+cytokine.pca <- deceased.v.recovered.juncture[,cytokines]
+rownames(cytokine.pca) <- deceased.v.recovered.juncture$ID
+cytokine.pca <- prcomp(cytokine.pca[,colSums(is.na(cytokine.pca)) == 0],center = T,scale. = T)
+deceased.v.recovered.juncture <- merge(deceased.v.recovered.juncture,cytokine.pca$x[,1:2],by.x="ID",by.y="row.names") 
+ggplot(deceased.v.recovered.juncture,aes(PC1,PC2,label=age.numeric,group=subject_id)) + geom_text_repel() + geom_line(color="grey",alpha=0.5) +
+  geom_point(aes(color = Age == "? 90",fill= as.factor(LatestOutcome)),size=2,alpha=0.75,pch=21) + 
+  theme_bw() + scale_fill_nejm(labels=c("discharged","deceased","hospice"),name="Status") + scale_color_manual(values=c("white","black")) +
+  labs(title="Yale critical sub-cohort")
+
+kable(patient.demo[unique(deceased.v.recovered.juncture$subject_id),])
+```
+<br/>
+
+#### Differential level within juncture
+Using the model: test_value ~ outcome + age.numeric + sex + DFSO + (1|subject_id), for samples within the juncture to identify cytokines
+with sig. differences between the two outcome groups
+```{r juncture.3,fig.cap="<b>Figure 2</b> Outcome effect and its significance in mixed-effect models comparing 71 cytokines of eventually deceased patients (n=8) relative to recovered patients (n=4) around critical juncture (17-23 days TSO). Significance is determined by ANOVA unadjusted p <= 0.05",out.width=800,fig.height=10}
+# test which one is diverging between 17-23 days for the two groups
+divergence.df <- data.frame()
+deceased.v.recovered.juncture.rel <- subset(deceased.v.recovered.juncture,DFSO >= 7 & DFSO <= 30)
+form <- test_value ~ outcome + age.numeric + sex + DFSO + (1|subject_id)
+for (i in cytokines) {
+  tmp <- deceased.v.recovered.juncture.rel
+  tmp$test_value <-  scale(tmp[,i])
+  tmp <- subset(tmp,DFSO >= 17 & DFSO <= 23)
+  lm.res <- lmer(form,tmp)
+  lm.anova <- anova(lm.res)
+  divergence.df <- rbind(divergence.df,data.frame(cytokine=i,coef=t(fixef(lm.res)),severity.outcome.pval = t(lm.anova$`Pr(>F)`),singular=isSingular(lm.res)))
+}
+divergence.df <- divergence.df[order(divergence.df$coef.outcomeDeceased),]
+divergence.df$cytokine <- factor(divergence.df$cytokine,levels=divergence.df$cytokine)
+ggplot(divergence.df,aes(cytokine,coef.outcomeDeceased)) + geom_hline(yintercept = 0,linetype="dashed") +
+  geom_point(aes(size=-log10(severity.outcome.pval.1),fill=severity.outcome.pval.1<=0.05),alpha=0.75,pch=21) + 
+  #geom_point(aes(y=coef.post.20daysTRUE,size=-log10(severity.outcome.pval.2),
+  #               color=singular,fill=severity.outcome.pval.2<=0.05),alpha=0.75,pch=22) + 
+  coord_flip() + ylab("Effect Size for Deceased Group") + xlab("Cytokine") + 
+  labs(title="Deceased vs. Recovered",subtitle = "Differential cytokines between 17 and 23 days post symptom onset") +
+  scale_color_manual(values=c("black","white")) + scale_fill_manual(name="Sig. P-Value",values=c("grey90","lightblue")) +
+  scale_size(name="-log10(p-val)") + theme_bw() + theme(text = element_text(size=8))
+sig.diff.cytokines <- as.character(subset(divergence.df,severity.outcome.pval.1 <= 0.05)$cytokine)
+```
+<br/>
+
+### Compare with Brescia cohort
+Compare test results with those from the Brescia cohort
+```{r compare,fig.cap="<b>Figure 3</b> Effects of the deceased group relative to recovered patients in the Brescia cohort on the x-axis and in the Yale cohort on the y-axis for the circulating levels of 38 overlapping cytokines in the critical juncture. Unadjusted ANOVA p values are used."}
+brescia.envir <- new.env()
+load(file.path(output.folder,"deceased.v.recovered.cytokine.test.results.RData"),verbose = F,envir = brescia.envir)
+brescia.cytokines <- tolower(gsub(".","",brescia.envir$merged.de.df$cytokine,fixed = T))
+names(brescia.cytokines) <- brescia.envir$merged.de.df$cytokine
+brescia.cytokines[c("IL.18.IL.1F4","IL.8","IFN.gamma","CXCL9.MIG","CX3CL1.Fractalkine","IL.17","SCF.c.kit.Ligand","VEGF","IL.1ra.IL.1F3")] <- 
+  c("il18","cxcl8","ifny","mig","fractalkine","il17a","scf","vegfa","il1ra")
+brescia.envir$merged.de.df$cytokine.standardized <- brescia.cytokines
+
+yale.cytokines <- tolower(sapply(as.character(divergence.df$cytokine),function(x){tail(unlist(strsplit(x,"[oO]r")),1)}))
+names(yale.cytokines) <- divergence.df$cytokine
+divergence.df$cytokine.standardized <- yale.cytokines[divergence.df$cytokine]
+
+# DE
+common.divergence.df <- merge(divergence.df,brescia.envir$merged.de.df,by="cytokine.standardized",suffixes = c(".yale",".brescia"))
+cor.test(common.divergence.df$coef.outcomeDeceased,common.divergence.df$de.coef.outcomeDeceased,method = "spearman")
+
+common.divergence.df.sig <- subset(common.divergence.df,de.pval.1 <= 0.05)
+cor.test(common.divergence.df.sig$coef.outcomeDeceased,common.divergence.df.sig$de.coef.outcomeDeceased,method = "spearman")
+ggplot(common.divergence.df,aes(de.coef.outcomeDeceased,coef.outcomeDeceased,label=cytokine.label.deceased.v.recovered )) + 
+  geom_hline(yintercept = 0) + geom_vline(xintercept = 0) +
+  geom_point(aes(fill=de.pval.1 <= 0.05),pch=21,alpha=0.75) + geom_text_repel(aes(color=severity.outcome.pval.1 <= 0.05),size=2) + 
+  scale_color_manual(name="Sig. p-value\nin Yale Cohort",values=c("grey","purple")) +
+    scale_fill_manual(name="Sig. p-value\nin Brescia Cohort",values=c("grey","red")) +
+  theme_bw() + xlab("Brescia Chohort ES") + ylab("Yale Cohort ES") + ggtitle("Deceased vs. Recovered")
+```
+
+
+### Session Info
+```{r save}
+sessionInfo()
+```
