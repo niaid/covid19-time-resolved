@@ -1,0 +1,465 @@
+---
+title: "4.TcellReclust.CD4"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, results = "hide")
+```
+
+## Recluster on RNA within the T cell subsets
+
+Load R packages and data:
+```{r loadpackagesanddata}
+#this is tested using R 3.6.1 on a high-performance comupting node with 8 cores and at least 320 gb or ram. 
+library("Seurat") #load Seurat 3.1
+library("dplyr")
+library("matrixStats")
+library('tidyverse')
+library('parallelDist')
+library("pheatmap")
+library("viridis")
+library("ggridges")
+library("magrittr")
+library("genefilter")
+library("DescTools")
+library("scico")
+
+#### Recluster on RNA within the T cell subsets ####
+
+## import the seurat object downloaded from GEO
+merge.SNG = readRDS("SeuratObjects/AllBatches_SeuratObj.rds")
+
+## import fgsea results tables
+t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable = read.table("Metadata/2020_08_09_t0_plus_healthy--healthy_vs_covid--COVID-Healthy.tsv", header = TRUE, sep = "\t")
+t0_plus_t0_covid_only.PC1.fgseaatable = read.table("Metadata/2020_08_09_t0_covid_only--PC1--PC1.tsv", header = TRUE, sep = "\t")
+
+```
+
+# Recluster within the CD4 cells, using the geneset enrichment leading edge genes identified in the pseudobulk differential expression analysis
+
+```{r reclustering, echo=FALSE}
+### RNA clustering
+library(genefilter)
+f1 <- pOverA(0.01, 2)
+ffun <- filterfun(f1)
+
+#filter out the cell subsets of interest
+TotalCD4.LG = subset(merge.SNG, WCTcoursecelltype %in% c("CD4_Naive","CD4_Mem","Treg"))
+
+#select just the leading edge genes for the pathway enrichment results of the relevant cell subsets
+tO.COVIDvsHealthy.SelectedPath.leadingEdge.LG = unique(unlist(strsplit(as.character(t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable[
+  which(
+    t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$pathway %in% c(
+      "HALLMARK_TNFA_SIGNALING_VIA_NFKB",
+      "HALLMARK_INFLAMMATORY_RESPONSE",
+      "btm_M4.1_cell cycle (I)",
+      "GO_RESPONSE_TO_TYPE_I_INTERFERON",
+      "KEGG_RIBOSOME",
+      "KEGG_GLYCOLYSIS_GLUCONEOGENESIS",
+      "KEGG_OXIDATIVE_PHOSPHORYLATION",
+      "reactome_Fatty acid metabolism"
+    ) 
+    &
+      t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$celltype %in% c(
+        "CD4_Naive",
+        "CD4_Mem",
+        "Treg"
+      )  
+  ),]$leadingEdge),  " ")))
+tO.PC1.SelectedPath.leadingEdge.LG = unique(unlist(strsplit(as.character(t0_plus_t0_covid_only.PC1.fgseaatable[
+  which(
+    t0_plus_t0_covid_only.PC1.fgseaatable$pathway %in% c(
+      "HALLMARK_TNFA_SIGNALING_VIA_NFKB",
+      "HALLMARK_INFLAMMATORY_RESPONSE",
+      "btm_M4.1_cell cycle (I)",
+      "GO_RESPONSE_TO_TYPE_I_INTERFERON",
+      "KEGG_RIBOSOME",
+      "KEGG_GLYCOLYSIS_GLUCONEOGENESIS",
+      "KEGG_OXIDATIVE_PHOSPHORYLATION",
+      "reactome_Fatty acid metabolism"
+    ) 
+    &
+      t0_plus_t0_covid_only.PC1.fgseaatable$celltype %in% c(
+        "CD4_Naive",
+        "CD4_Mem",
+        "Treg"
+      )  
+  ),]$leadingEdge),  " ")))
+
+#run the clustering within the selected subset using filtered genes
+TotalCD4.LG = ScaleData(TotalCD4.LG, assay="RNA", features = unique(c(tO.COVIDvsHealthy.SelectedPath.leadingEdge.LG,tO.PC1.SelectedPath.leadingEdge.LG)), vars.to.regress=c("Donor","Batch"))
+TotalCD4.LG <- RunPCA(TotalCD4.LG, assay="RNA", slot = "scale.data", 
+                      features = unique(c(tO.COVIDvsHealthy.SelectedPath.leadingEdge.LG,tO.PC1.SelectedPath.leadingEdge.LG)), reduction.name = "pcaledge")
+TotalCD4.LG <- FindNeighbors(TotalCD4.LG, dims = 1:15, reduction = "pcaledge")
+TotalCD4.LG <- FindClusters(TotalCD4.LG, resolution = c(1), algorithm = 1)
+```
+
+#Plot clusters for figure S6
+Figure S6A:
+```{r FigureS6A,  fig.width = 10, fig.height = 10}
+library(ComplexHeatmap)
+library(viridis)
+viridis(9)
+
+### heatmap for the CD8 clusters on leading edge genes of selected pathways
+TotalCD4.LG$WCTRNAclusters = paste0("TotalCD4.LG_",TotalCD4.LG$RNA_snn_res.1)
+TotalCD4.LG = ScaleData(TotalCD4.LG, assay="RNA", features = unique(c(tO.COVIDvsHealthy.SelectedPath.leadingEdge.LG,tO.PC1.SelectedPath.leadingEdge.LG)))
+TotalCD4.selectclust.LG = subset(TotalCD4.LG, Sorted == "N" & RNA_snn_res.1 %in% c(14)& Timepoint == "T0") #
+
+# create vector to label genesets
+inflamgenes <- rownames(GetAssayData(TotalCD4.selectclust.LG, assay = "RNA", slot = "scale.data")) %in% 
+  union(unique(unlist(strsplit(as.character(t0_plus_t0_covid_only.PC1.fgseaatable[
+    which(
+      t0_plus_t0_covid_only.PC1.fgseaatable$pathway %in% c(
+        
+        "HALLMARK_INFLAMMATORY_RESPONSE"
+        
+      ) 
+      &
+        t0_plus_t0_covid_only.PC1.fgseaatable$celltype %in% c(
+          "CD4_Naive",
+          "CD4_Mem",
+          "Treg"
+        )  
+    ),]$leadingEdge),  " ")))
+    ,
+    unique(unlist(strsplit(as.character(t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable[
+      which(
+        t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$pathway %in% c(
+          
+          "HALLMARK_INFLAMMATORY_RESPONSE"
+          
+        ) 
+        &
+          t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$celltype %in% c(
+            "CD4_Naive",
+            "CD4_Mem",
+            "Treg"
+          )  
+      ),]$leadingEdge),  " ")))
+    )
+
+cellcyclegenes <- rownames(GetAssayData(TotalCD4.selectclust.LG, assay = "RNA", slot = "scale.data")) %in% 
+  union(unique(unlist(strsplit(as.character(t0_plus_t0_covid_only.PC1.fgseaatable[
+    which(
+      t0_plus_t0_covid_only.PC1.fgseaatable$pathway %in% c(
+        
+        "btm_M4.1_cell cycle (I)"
+      ) 
+      &
+        t0_plus_t0_covid_only.PC1.fgseaatable$celltype %in% c(
+          "CD4_Naive",
+          "CD4_Mem",
+          "Treg"
+        )  
+    ),]$leadingEdge),  " ")))
+    ,
+    unique(unlist(strsplit(as.character(t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable[
+      which(
+        t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$pathway %in% c(
+         
+          "btm_M4.1_cell cycle (I)"
+          
+        ) 
+        &
+          t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$celltype %in% c(
+            "CD4_Naive",
+            "CD4_Mem",
+            "Treg"
+          )  
+      ),]$leadingEdge),  " ")))
+  )
+
+T1INFgenes <- rownames(GetAssayData(TotalCD4.selectclust.LG, assay = "RNA", slot = "scale.data")) %in% 
+  union(unique(unlist(strsplit(as.character(t0_plus_t0_covid_only.PC1.fgseaatable[
+    which(
+      t0_plus_t0_covid_only.PC1.fgseaatable$pathway %in% c(
+        
+        "GO_RESPONSE_TO_TYPE_I_INTERFERON"
+      ) 
+      &
+        t0_plus_t0_covid_only.PC1.fgseaatable$celltype %in% c(
+          "CD4_Naive",
+          "CD4_Mem",
+          "Treg"
+        )  
+    ),]$leadingEdge),  " ")))
+    ,
+    unique(unlist(strsplit(as.character(t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable[
+      which(
+        t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$pathway %in% c(
+          
+          "GO_RESPONSE_TO_TYPE_I_INTERFERON"
+        ) 
+        &
+          t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$celltype %in% c(
+            "CD4_Naive",
+            "CD4_Mem",
+            "Treg"
+          )  
+      ),]$leadingEdge),  " ")))
+  )
+
+HALLMARK_TNFA_SIGNALING_VIA_NFKB <- rownames(GetAssayData(TotalCD4.selectclust.LG, assay = "RNA", slot = "scale.data")) %in% 
+  union(unique(unlist(strsplit(as.character(t0_plus_t0_covid_only.PC1.fgseaatable[
+    which(
+      t0_plus_t0_covid_only.PC1.fgseaatable$pathway %in% c(
+        "HALLMARK_TNFA_SIGNALING_VIA_NFKB"
+        
+      ) 
+      &
+        t0_plus_t0_covid_only.PC1.fgseaatable$celltype %in% c(
+          "CD4_Naive",
+          "CD4_Mem",
+          "Treg"
+        )  
+    ),]$leadingEdge),  " ")))
+    ,
+    unique(unlist(strsplit(as.character(t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable[
+      which(
+        t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$pathway %in% c(
+          "HALLMARK_TNFA_SIGNALING_VIA_NFKB"
+        ) 
+        &
+          t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$celltype %in% c(
+            "CD4_Naive",
+            "CD4_Mem",
+            "Treg"
+          )  
+      ),]$leadingEdge),  " ")))
+  )
+
+ribosome <- rownames(GetAssayData(TotalCD4.selectclust.LG, assay = "RNA", slot = "scale.data")) %in% 
+  union(unique(unlist(strsplit(as.character(t0_plus_t0_covid_only.PC1.fgseaatable[
+    which(
+      t0_plus_t0_covid_only.PC1.fgseaatable$pathway %in% c(
+       
+        "KEGG_RIBOSOME"
+      ) 
+      &
+        t0_plus_t0_covid_only.PC1.fgseaatable$celltype %in% c(
+          "CD4_Naive",
+          "CD4_Mem",
+          "Treg"
+        )  
+    ),]$leadingEdge),  " ")))
+    ,
+    unique(unlist(strsplit(as.character(t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable[
+      which(
+        t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$pathway %in% c(
+          
+          "KEGG_RIBOSOME"
+        ) 
+        &
+          t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$celltype %in% c(
+            "CD4_Naive",
+            "CD4_Mem",
+            "Treg"
+          )  
+      ),]$leadingEdge),  " ")))
+  )
+
+KEGG_GLYCOLYSIS_GLUCONEOGENESIS <- rownames(GetAssayData(TotalCD4.selectclust.LG, assay = "RNA", slot = "scale.data")) %in% 
+  union(unique(unlist(strsplit(as.character(t0_plus_t0_covid_only.PC1.fgseaatable[
+    which(
+      t0_plus_t0_covid_only.PC1.fgseaatable$pathway %in% c(
+        
+        "KEGG_GLYCOLYSIS_GLUCONEOGENESIS"
+      ) 
+      &
+        t0_plus_t0_covid_only.PC1.fgseaatable$celltype %in% c(
+          "CD4_Naive",
+          "CD4_Mem",
+          "Treg"
+        )  
+    ),]$leadingEdge),  " ")))
+    ,
+    unique(unlist(strsplit(as.character(t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable[
+      which(
+        t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$pathway %in% c(
+          
+          "KEGG_GLYCOLYSIS_GLUCONEOGENESIS"
+        ) 
+        &
+          t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$celltype %in% c(
+            "CD4_Naive",
+            "CD4_Mem",
+            "Treg"
+          )  
+      ),]$leadingEdge),  " ")))
+  )
+
+KEGG_OXIDATIVE_PHOSPHORYLATION <- rownames(GetAssayData(TotalCD4.selectclust.LG, assay = "RNA", slot = "scale.data")) %in% 
+  union(unique(unlist(strsplit(as.character(t0_plus_t0_covid_only.PC1.fgseaatable[
+    which(
+      t0_plus_t0_covid_only.PC1.fgseaatable$pathway %in% c(
+        
+        "KEGG_OXIDATIVE_PHOSPHORYLATION"
+      ) 
+      &
+        t0_plus_t0_covid_only.PC1.fgseaatable$celltype %in% c(
+          "CD4_Naive",
+          "CD4_Mem",
+          "Treg"
+        )  
+    ),]$leadingEdge),  " ")))
+    ,
+    unique(unlist(strsplit(as.character(t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable[
+      which(
+        t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$pathway %in% c(
+          
+          "KEGG_OXIDATIVE_PHOSPHORYLATION"
+        ) 
+        &
+          t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$celltype %in% c(
+            "CD4_Naive",
+            "CD4_Mem",
+            "Treg"
+          )  
+      ),]$leadingEdge),  " ")))
+  )
+
+reactome_Fattyacidmetabolism <- rownames(GetAssayData(TotalCD4.selectclust.LG, assay = "RNA", slot = "scale.data")) %in% 
+  union(unique(unlist(strsplit(as.character(t0_plus_t0_covid_only.PC1.fgseaatable[
+    which(
+      t0_plus_t0_covid_only.PC1.fgseaatable$pathway %in% c(
+        
+        "reactome_Fatty acid metabolism"
+      ) 
+      &
+        t0_plus_t0_covid_only.PC1.fgseaatable$celltype %in% c(
+          "CD4_Naive",
+          "CD4_Mem",
+          "Treg"
+        )  
+    ),]$leadingEdge),  " ")))
+    ,
+    unique(unlist(strsplit(as.character(t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable[
+      which(
+        t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$pathway %in% c(
+          
+          "reactome_Fatty acid metabolism"
+        ) 
+        &
+          t0_plus_healthy.healthy_vs_covid.COVID.Healthy.fgseaatable$celltype %in% c(
+            "CD4_Naive",
+            "CD4_Mem",
+            "Treg"
+          )  
+      ),]$leadingEdge),  " ")))
+  )
+
+ha.CD4 = HeatmapAnnotation(
+  # PC1 = TotalCD4.selectclust.LG$PC1,
+  # PC1class = TotalCD4.selectclust.LG$PC1_cat,
+  # Class = TotalCD4.selectclust.LG$Class,
+  Cluster = TotalCD4.selectclust.LG$WCTRNAclusters
+)
+
+# list genes to be labeled in text on the plot
+GOI = c("MX1","IFNAR1","IFNGR2","IRF3", "JUNB","PCNA","CEBPB","SOCS3","IL23A","EIF1","HIF1A","ALDOA", "POLA1",
+        "STAT2","OAS1","NFKBIA","IRF7","MKI67", "TNFAIP3","TNF","TAP1","CD69","RELA", "SELL" ,"ISG15","AREG",
+        "RPL13A","RPL22")
+label <- which(rownames(GetAssayData(TotalCD4.selectclust.LG, assay = "RNA", slot = "scale.data")) %in% GOI)
+label_genes <- rownames(GetAssayData(TotalCD4.selectclust.LG, assay = "RNA", slot = "scale.data"))[label]
+  
+  
+library("circlize")
+col_fun = colorRamp2(c(-1.5, 0, 1.5), c("#FF00FF", "#000000", "#FFFF00"))
+
+Idents(TotalCD4.LG) <- "RNA_snn_res.1"
+TotalCD4.T0.LG = subset(TotalCD4.LG, Sorted == "N" & Timepoint == "T0")
+
+TotalCD4.T0.aver.LG = AverageExpression(TotalCD4.T0.LG, return.seurat = TRUE)
+TotalCD4.T0.aver.LG = ScaleData(TotalCD4.T0.aver.LG, assay="RNA", features = unique(c(tO.COVIDvsHealthy.SelectedPath.leadingEdge.LG,tO.PC1.SelectedPath.leadingEdge.LG)))
+
+GOI = c("MX1","IFNAR1","IFNGR2","IRF3", "JUNB","PCNA","CEBPB","SOCS3","IL23A","EIF1","HIF1A","ALDOA", "POLA1",
+        "STAT2","OAS1","NFKBIA","IRF7","MKI67", "TNFAIP3","TNF","TAP1","CD69","RELA", "SELL" ,"ISG15","AREG","RPL13A","RPL22")
+label <- which(rownames(GetAssayData(TotalCD4.T0.aver.LG, assay = "RNA", slot = "scale.data")) %in% GOI)
+label_genes <- rownames(GetAssayData(TotalCD4.T0.aver.LG, assay = "RNA", slot = "scale.data"))[label]
+
+Heatmap(as.matrix(GetAssayData(TotalCD4.T0.aver.LG, assay = "RNA", slot = "scale.data")), name = "CD4", show_column_names = TRUE,
+        cluster_columns = TRUE, column_title_rot = 90,
+        #column_split = TotalCD8.T0.aver.LG$,
+        col = col_fun,
+        row_km = 8,
+        row_names_gp = gpar(fontsize = 10)
+) +
+  Heatmap(inflamgenes + 0, name = "HALLMARK_INFLAMMATORY_RESPONSE", col = c("0" = "white", "1" = "purple"),
+          show_heatmap_legend = FALSE, width = unit(2, "mm"), column_names_gp = gpar(fontsize = 6)) +
+  Heatmap(HALLMARK_TNFA_SIGNALING_VIA_NFKB + 0, name = "HALLMARK_TNFA_SIGNALING_VIA_NFKB", col = c("0" = "white", "1" = "red"),
+          show_heatmap_legend = FALSE, width = unit(2, "mm"), column_names_gp = gpar(fontsize = 6)) +
+  Heatmap(cellcyclegenes + 0, name = "btm_M4.1_cellcycle", col = c("0" = "white", "1" = "blue"),
+          show_heatmap_legend = FALSE, width = unit(2, "mm"), column_names_gp = gpar(fontsize = 6)) +
+  Heatmap(T1INFgenes + 0, name = "GO_RESPONSE_TO_TYPE_I_INTERFERON", col = c("0" = "white", "1" = "black"),
+          show_heatmap_legend = FALSE, width = unit(2, "mm"), column_names_gp = gpar(fontsize = 6)) +
+  Heatmap(ribosome + 0, name = "KEGG_RIBOSOME", col = c("0" = "white", "1" = "orange"),
+          show_heatmap_legend = FALSE, width = unit(2, "mm"), column_names_gp = gpar(fontsize = 6)) +
+  Heatmap(KEGG_GLYCOLYSIS_GLUCONEOGENESIS + 0, name = "KEGG_GLYCOLYSIS_GLUCONEOGENESIS", col = c("0" = "white", "1" = "pink"),
+          show_heatmap_legend = FALSE, width = unit(2, "mm"), column_names_gp = gpar(fontsize = 6)) +
+  Heatmap(KEGG_OXIDATIVE_PHOSPHORYLATION + 0, name = "KEGG_OXIDATIVE_PHOSPHORYLATION", col = c("0" = "white", "1" = "green"),
+          show_heatmap_legend = FALSE, width = unit(2, "mm"), column_names_gp = gpar(fontsize = 6)) +
+  Heatmap(reactome_Fattyacidmetabolism + 0, name = "reactome_Fatty acid metabolism", col = c("0" = "white", "1" = "grey"),
+          show_heatmap_legend = FALSE, width = unit(2, "mm"), column_names_gp = gpar(fontsize = 6)) +
+  rowAnnotation(foo = anno_mark(at = label,
+                              labels = label_genes,
+                              labels_gp = gpar(fontsize = 8)))
+
+```
+
+Barplot of fraction clonal cells per cluster for figure S6A:
+```{r FigureS6Apart2,  fig.width = 8, fig.height = 4}
+expandedT = read.table("Metadata/2020_07_28_tcell_expansion_df.tsv", header = TRUE)
+
+TotalCD4.LG$Expanded <- ifelse(colnames(TotalCD4.LG) %in% 
+                                 expandedT$barcodeBatch[which(expandedT$expanded == TRUE)], TRUE, FALSE)
+
+TotalCD4.T0.LG$Expanded <- ifelse(colnames(TotalCD4.T0.LG) %in% 
+                                 expandedT$barcodeBatch[which(expandedT$expanded == TRUE)], TRUE, FALSE)
+
+TotalCD4.T0.LG.unsort <- subset(TotalCD4.T0.LG, Sorted == "N")
+
+#make barplots of expanded cell percentage per cluster
+barplot(prop.table(table(TotalCD4.T0.LG.unsort$RNA_snn_res.1, TotalCD4.T0.LG.unsort$Expanded), 
+                   margin = 1)[c(7,10,12,3,13,8,2,1,11,4,10,5,14,15,6),2],
+        horiz = FALSE,
+        ylim = c(0,1)
+        )
+```
+
+Protein heatmap for figure S6B
+```{r FigureS6B,  fig.width = 8, fig.height = 4}
+quantile_breaks <- function(xs, n = 100) {
+  breaks <- quantile(xs, probs = seq(0.5, 1, length.out = n))
+  breaks[!duplicated(breaks)]
+}
+source("utilityFunctions/AverageExpression_MeanOnly.r")
+environment(AverageExpression_MeanOnly) <- asNamespace('Seurat') # need this to allow the function to call hidden seurat package functions
+TotalCD4.T0.LGAver = AverageExpression_MeanOnly(TotalCD4.T0.LG, return.seurat=F)
+mat_breaks.temp <- quantile_breaks(as.matrix(TotalCD4.T0.LGAver$limmaCITE[c("CD38", "HLA-DR","CD278","CD279", "CD71","KLRG1", "CD28","CD45RA","CD45RO"),]), n = 101)
+pheatmap(TotalCD4.T0.LGAver$limmaCITE[c("CD38", "HLA-DR","CD278","CD279", "CD71","KLRG1", "CD28","CD45RA","CD45RO"),], scale = "none", border_color=NA, viridis(n=100), breaks = mat_breaks.temp)
+
+```
+
+Heatmap of overlap of RNA clusters and protein based cluster labels, for Figure S6D
+```{r FigS6D, fig.width = 4, fig.height = 6,}
+CD4.T0.LG.SpecificGatingPerCluster = prop.table(table(Idents(TotalCD4.T0.LG), TotalCD4.T0.LG$specific_gating), margin = 1)
+CD4.T0.LG.GateGroupMergedPerCluster = prop.table(table(Idents(TotalCD4.T0.LG), TotalCD4.T0.LG$gate_group_merged), margin = 1)
+CD4.T0.LG.WCTmergedPerCluster = prop.table(table(Idents(TotalCD4.T0.LG), TotalCD4.T0.LG$WCTmergedcelltype), margin = 1)
+colnames(CD4.T0.LG.WCTmergedPerCluster)[17] <- "Treg.ActT"
+pheatmap(CD4.T0.LG.WCTmergedPerCluster[,which(!colnames(CD4.T0.LG.WCTmergedPerCluster) %in% 
+                                                   c("CD4_Mem_CD69pos","CD4_Mem_Activated.HLADRhi",
+                                                     "CD4_Mem_CD22hi","CD4_Mem_MAIT",
+                                                     "CD4_Naive_MAIT","CD4_Naive_CD38hi",
+                                                     "CD4_Mem_integrin.hi","CD4_Mem_CD41hi",
+                                                     "CD4_Mem_IgG.IsoBinding","CD4_Mem_CD146hi",
+                                                     "CD4_Naive_IgG.IsoBinding"))],
+         border_color = NA)
+pheatmap(cbind(Tfh = CD4.T0.LG.SpecificGatingPerCluster[,2], GatedTreg = CD4.T0.LG.GateGroupMergedPerCluster[,13]),
+         border_color = NA)
+
+
+```
