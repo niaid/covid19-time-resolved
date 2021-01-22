@@ -10,15 +10,6 @@ KEEP_TIMEPOINTS = {
         "all_timepoints_covid_only" : ["T0", "T1", "T2", "T3"]
         }
 
-FORMULAS_T0_WHEALTHY = {
-        "healthy_vs_covid": "~ Class + Age  + Batch",
-        "healthy_vs_severitygroup": "~ cond_group + Age  + Batch",
-        }
-
-COEFFICIENTS_T0_WHEALTHY = {
-        "healthy_vs_covid" : "ClassCOVID",
-        "healthy_vs_severitygroup" : ["cond_groupSevere", "cond_groupCritical"]
-        }
 
 CELLTYPES = []
 #dge_files = os.listdir("pseudobulk_dgelists")
@@ -35,6 +26,14 @@ for fp in dge_files:
     cell = cell.replace("t0_plus_healthy/pseudobulk_esets/", "")
     CELLTYPES.append(cell)
 
+FORMULAS_T0_WHEALTHY = {
+        "healthy_vs_covid": "~ Class + Age  + Batch",
+        }
+
+COEFFICIENTS_T0_WHEALTHY = {
+        "healthy_vs_covid" : "ClassCOVID",
+        }
+
 FORMULAS_COVID_TIMECOURSE = {
         "days_onset": "~ days_since_onset + Age + batch",
         }
@@ -45,31 +44,13 @@ COEFFICIENTS_COVID_TIMECOURSE = {
 
 
 FORMULAS_T0_COVID = {
-        "severity": "~ severity + days_since_onset + Age + batch",
-        "severity.outcome": "~ severity.outcome + days_since_onset + Age + batch",
         "PC1": "~ PC1 + days_since_onset + Age + batch",
         "PC1_cat": "~ PC1_cat + days_since_onset + Age + batch",
-        "PC2": "~ PC2 + days_since_onset + Age + batch",
-        "PLS1": "~ PLS1 + days_since_onset + Age + batch",
-        "t0crp": "~ T0_crp + days_since_onset + Age + batch",
-        "initial.Spike" : " ~ initial.Spike + days_since_onset + Age + batch",
-        "initial.Nucleocapsid" : " ~ initial.Nucleocapsid + days_since_onset + Age + batch",
-        "spike.dicharge.delta.t0" : " ~ spike.dicharge.delta.t0 + days_since_onset + Age + batch" ,
-        "nucleocapsid.dicharge.delta.t0" : " ~ nucleocapsid.dicharge.delta.t0 + days_since_onset + Age + batch"
         }
 
 COEFFICIENTS_T0_COVID = {
-        "severity" : "severitySevere",
-        "severity.outcome" : ["severity.outcomeCritical-Deceased", "severity.outcomeCritical-alive", "severity.outcomeModerate-alive"],
-        "t0crp" : "T0_crp",
         "PC1" : "PC1",
         "PC1_cat" : "PC1_catPC1_high",
-        "PC2" : "PC2",
-        "PLS1" : "PLS1",
-        "initial.Spike" : "initial.Spike",
-        "initial.Nucleocapsid" : "initial.Nucleocapsid",
-        "spike.dicharge.delta.t0" : "spike.dicharge.delta.t0" ,
-        "nucleocapsid.dicharge.delta.t0" : "nucleocapsid.dicharge.delta.t0"
         }
 
 COEFFICIENTS = {

@@ -2,68 +2,19 @@ workdir: "data/CITE5p/all_batches/expanded_tcell_pbulk_DE/2020_08_25/sample_grou
 
 FORMULAS = {
         "days_since_onset": "~ days_since_onset + Age + batch",
-        "days_since_hospitalized": "~ days_since_hospitalized + Age + batch",
-        "severity": "~ 0 + severity + days_since_onset + Age + batch",
-        #"severity.outcome": "~ severity.outcome + days_since_onset + Age + batch",
         "PC1": "~ PC1 + days_since_onset + Age + batch",
         "PC1_group": "~ 0 + PC1_cat + days_since_onset + Age + batch",
-        #"t0crp": "~ T0_crp + days_since_onset + Age + batch",
-        "initial.Spike" : " ~ initial.Spike + days_since_onset + Age + batch",
-        "initial.Spike.corrected" : " ~ initial.Spike.corrected + days_since_onset + Age + batch",
-        "initial.Nucleocapsid" : " ~ initial.Nucleocapsid + days_since_onset + Age + batch",
-        "initial.Nucleocapsid.corrected" : " ~ initial.Nucleocapsid.corrected + days_since_onset + Age + batch",
-        "peak.Spike" : " ~ spike.peak.Spike + days_since_onset + Age + batch",
-        "peak.Spike.corrected" : " ~ spike.peak.Spike.corrected + days_since_onset + Age + batch",
-        "peak.Nucleocapsid" : " ~ nucleocapsid.peak.Nucleocapsid + days_since_onset + Age + batch",
-        "peak.Nucleocapsid.corrected" : " ~ nucleocapsid.peak.Nucleocapsid.corrected + days_since_onset + Age + batch",
-        "onset_group" : "~ 0 + onset_group + days_since_hospitalized + Age + batch"
         }
 
 COEFFICIENTS = {
-        "days_since_hospitalized": {
-            "days_since_hospitalized" : "days_since_hospitalized",
-            "Age" : "Age"},
         "days_since_onset": {
             "days_since_onset" : "days_since_onset",
             "Age" : "Age"},
-        "severity" : {"Critical-Severe": "severityCritical - severitySevere"},
-        #"severity.outcome" : ["severity.outcomeCritical-Deceased", "severity.outcomeCritical-Alive", "severity.outcomeModerate-Alive"],
-        "t0crp" : {"T0_crp" : "T0_crp"},
         "PC1" : {
             "PC1" : "PC1",
             "Age" : "Age"},
         "PC1_group" : {
             "PC1high-low" : "PC1_catPC1_high - PC1_catPC1_low",
-            "Age" : "Age"},
-        "initial.Spike" : {
-            "initial.Spike" : "initial.Spike",
-            },
-        "initial.Nucleocapsid" : {
-            "initial.Nucleocapsid" : "initial.Nucleocapsid",
-            },
-        "peak.Spike" : {
-            "peak.Spike" : "spike.peak.Spike",
-            },
-        "peak.Nucleocapsid" : {
-            "peak.Nucleocapsid" : "nucleocapsid.peak.Nucleocapsid",
-            },
-        "initial.Spike.corrected" : {
-            "initial.Spike.corrected" : "initial.Spike.corrected",
-            "Age" : "Age"},
-        "initial.Nucleocapsid.corrected" : {
-            "initial.Nucleocapsid.corrected" : "initial.Nucleocapsid.corrected",
-            "Age" : "Age"},
-        "peak.Spike.corrected" : {
-            "peak.Spike.corrected" : "spike.peak.Spike.corrected",
-            "Age" : "Age"},
-        "peak.Nucleocapsid.corrected" : {
-            "peak.Nucleocapsid.corrected" : "nucleocapsid.peak.Nucleocapsid.corrected",
-            "Age" : "Age"},
-        "onset_group" : {
-            "mid-early": "onset_groupmid - onset_groupearly",
-            "mid-late": "onset_groupmid - onset_grouplate",
-            "late-early" : "onset_grouplate - onset_groupearly",
-            "mid-early&late" : "onset_groupmid - (onset_groupearly + onset_grouplate)/2",
             "Age" : "Age"},
         }
 

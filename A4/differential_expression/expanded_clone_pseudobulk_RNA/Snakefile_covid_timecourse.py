@@ -1,31 +1,22 @@
 workdir: "data/CITE5p/all_batches/expanded_tcell_pbulk_DE/2020_08_25/sample_groups/all_timepoints_covid_only"
 
 FORMULAS = {
-        "days_hospitalized": "~ days_since_hospitalized + Age + batch",
         "days_onset": "~ days_since_onset + Age + batch",
-        "days_onsetXPC1" : "~ days_since_onset:PC1 + PC1 + days_since_onset + Age + batch",
         "onset_group" : "~ 0 + onset_group + Age + batch",
-        "MonoClassical" : "~ Mono_Classical + Age + batch",
         "PC1_onset_group_interaction" : "~ 0 + PC1_onset_group + Age + batch",
         "PC1group_onsetcontinous_interaction" : "~ PC1_cat:days_since_onset + PC1_cat + days_since_onset + Age + batch"
         }
 
 COEFFICIENTS = {
-        "days_hospitalized": {
-            "days_since_hospitalized" : "days_since_hospitalized",
-            "Age" : "Age"},
         "days_onset": {
             "days_since_onset" : "days_since_onset",
             "Age" : "Age"},
-        "days_onsetXPC1" : {
-            "days_since_onsetXPC1" : "days_since_onsetXPC1"},
         "onset_group" : {
             "mid-early": "onset_groupmid - onset_groupearly",
             "mid-late": "onset_groupmid - onset_grouplate",
             "late-early" : "onset_grouplate - onset_groupearly",
             "mid-early&late" : "onset_groupmid - (onset_groupearly + onset_grouplate)/2",
             "Age" : "Age"},
-        "MonoClassical" : {"MonoClassical" : "Mono_Classical"},
         "PC1_onset_group_interaction" : {
             "PC1High-low_X_onsetMid-early" : "(PC1_onset_groupPC1_high_mid - PC1_onset_groupPC1_low_mid) - (PC1_onset_groupPC1_high_early - PC1_onset_groupPC1_low_early)",
             "mid-early_in_PC1high": "PC1_onset_groupPC1_high_mid - PC1_onset_groupPC1_high_early",

@@ -23,111 +23,49 @@ KEEP_TIMEPOINTS = {
 
 FORMULAS_T0_WHEALTHY = {
         "healthy_vs_covid" : "~ 0 + Class + Age + Batch",
-        "healthy_vs_severitygroup" : "~ 0 + cond_group + Age + Batch",
         }
 
 COEFFICIENTS_T0_WHEALTHY = {
         "healthy_vs_covid" : {
             "COVID-Healthy" : "ClassCOVID - ClassHC",
             "Age" : "Age"},
-        "healthy_vs_severitygroup" : {
-            "Severe-Healthy" : "cond_groupSevere - cond_groupHC",
-            "Critical-Healthy" : "cond_groupCritical - cond_groupHC"
-            }
         }
 
 FORMULAS_T0_COVID = {
         "days_since_onset": "~ days_since_onset + Age + batch",
-        "days_since_hospitalized": "~ days_since_hospitalized + Age + batch",
-        "severity": "~ 0 + severity + days_since_onset + Age + batch",
-        #"severity.outcome": "~ severity.outcome + days_since_onset + Age + batch",
         "PC1": "~ PC1 + days_since_onset + Age + batch",
         "PC1_group": "~ 0 + PC1_cat + days_since_onset + Age + batch",
-        "t0crp": "~ T0_crp + days_since_onset + Age + batch",
-        "initial.Spike" : " ~ initial.Spike + days_since_onset + Age + batch",
-        "initial.Spike.corrected" : " ~ initial.Spike.corrected + days_since_onset + Age + batch",
-        "initial.Nucleocapsid" : " ~ initial.Nucleocapsid + days_since_onset + Age + batch",
-        "initial.Nucleocapsid.corrected" : " ~ initial.Nucleocapsid.corrected + days_since_onset + Age + batch",
-        "peak.Spike" : " ~ spike.peak.Spike + days_since_onset + Age + batch",
-        "peak.Spike.corrected" : " ~ spike.peak.Spike.corrected + days_since_onset + Age + batch",
-        "peak.Nucleocapsid" : " ~ nucleocapsid.peak.Nucleocapsid + days_since_onset + Age + batch",
-        "peak.Nucleocapsid.corrected" : " ~ nucleocapsid.peak.Nucleocapsid.corrected + days_since_onset + Age + batch",
-        "onset_group" : "~ 0 + onset_group + days_since_hospitalized + Age + batch"
         }
 
 COEFFICIENTS_T0_COVID = {
-        "days_since_hospitalized": {
-            "days_since_hospitalized" : "days_since_hospitalized",
-            "Age" : "Age"},
         "days_since_onset": {
             "days_since_onset" : "days_since_onset",
             "Age" : "Age"},
-        "severity" : {"Critical-Severe": "severityCritical - severitySevere"},
-        "t0crp" : {"T0_crp" : "T0_crp"},
         "PC1" : {
             "PC1" : "PC1",
             "Age" : "Age"},
         "PC1_group" : {
             "PC1high-low" : "PC1_catPC1_high - PC1_catPC1_low",
             "Age" : "Age"},
-        "initial.Spike" : {
-            "initial.Spike" : "initial.Spike",
-            },
-        "initial.Nucleocapsid" : {
-            "initial.Nucleocapsid" : "initial.Nucleocapsid",
-            },
-        "peak.Spike" : {
-            "peak.Spike" : "spike.peak.Spike",
-            },
-        "peak.Nucleocapsid" : {
-            "peak.Nucleocapsid" : "nucleocapsid.peak.Nucleocapsid",
-            },
-        "initial.Spike.corrected" : {
-            "initial.Spike.corrected" : "initial.Spike.corrected",
-            "Age" : "Age"},
-        "initial.Nucleocapsid.corrected" : {
-            "initial.Nucleocapsid.corrected" : "initial.Nucleocapsid.corrected",
-            "Age" : "Age"},
-        "peak.Spike.corrected" : {
-            "peak.Spike.corrected" : "spike.peak.Spike.corrected",
-            "Age" : "Age"},
-        "peak.Nucleocapsid.corrected" : {
-            "peak.Nucleocapsid.corrected" : "nucleocapsid.peak.Nucleocapsid.corrected",
-            "Age" : "Age"},
-        "onset_group" : {
-            "mid-early": "onset_groupmid - onset_groupearly",
-            "mid-late": "onset_groupmid - onset_grouplate",
-            "late-early" : "onset_grouplate - onset_groupearly",
-            "mid-early&late" : "onset_groupmid - (onset_groupearly + onset_grouplate)/2",
-            "Age" : "Age"},
         }
 
 FORMULAS_COVID_TIMECOURSE = {
-        "days_hospitalized": "~ days_since_hospitalized + Age + batch",
         "days_onset": "~ days_since_onset + Age + batch",
-        "days_onsetXPC1" : "~ days_since_onset:PC1 + PC1 + days_since_onset + Age + batch",
         "onset_group" : "~ 0 + onset_group + Age + batch",
-        #"MonoClassical" : "~ Mono_Classical + Age + batch",
         "PC1_onset_group_interaction" : "~ 0 + PC1_onset_group + Age + batch",
         "PC1group_onsetcontinous_interaction" : "~ PC1_cat:days_since_onset + PC1_cat + days_since_onset + Age + batch"
         }
 
 COEFFICIENTS_COVID_TIMECOURSE = {
-        "days_hospitalized": {
-            "days_since_hospitalized" : "days_since_hospitalized",
-            "Age" : "Age"},
         "days_onset": {
             "days_since_onset" : "days_since_onset",
             "Age" : "Age"},
-        "days_onsetXPC1" : {
-            "days_since_onsetXPC1" : "days_since_onsetXPC1"},
         "onset_group" : {
             "mid-early": "onset_groupmid - onset_groupearly",
             "mid-late": "onset_groupmid - onset_grouplate",
             "late-early" : "onset_grouplate - onset_groupearly",
             "mid-early&late" : "onset_groupmid - (onset_groupearly + onset_grouplate)/2",
             "Age" : "Age"},
-        #"MonoClassical" : {"MonoClassical" : "Mono_Classical"},
         "PC1_onset_group_interaction" : {
             "PC1High-low_X_onsetMid-early" : "(PC1_onset_groupPC1_high_mid - PC1_onset_groupPC1_low_mid) - (PC1_onset_groupPC1_high_early - PC1_onset_groupPC1_low_early)",
             "mid-early_in_PC1high": "PC1_onset_groupPC1_high_mid - PC1_onset_groupPC1_high_early",

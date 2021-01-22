@@ -2,17 +2,12 @@ workdir: "data/CITE5p/all_batches/differential_expression/2020_08_09/sample_grou
 
 FORMULAS = {
         "healthy_vs_covid" : "~ 0 + Class + Age + Batch",
-        "healthy_vs_severitygroup" : "~ 0 + cond_group + Age + Batch",
         }
 
 COEFFICIENTS = {
         "healthy_vs_covid" : {
             "COVID-Healthy" : "ClassCOVID - ClassHC",
             "Age" : "Age"},
-        "healthy_vs_severitygroup" : {
-            "Severe-Healthy" : "cond_groupSevere - cond_groupHC",
-            "Critical-Healthy" : "cond_groupCritical - cond_groupHC"
-            }
         }
 
 
