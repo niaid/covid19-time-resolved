@@ -1,28 +1,28 @@
 workdir: "data/externalData/SchulteSchrepping/differential_expression_cohort2/sample_groups/all_timepoints_covid_only"
 
 FORMULAS = {
-        #"days_onset": "~ days_after_onset + age_numeric",
-        #"Severity_onset_group_interaction" : "~ 0 + severity_onsetgroup2 + age_numeric",
+        "days_onset": "~ days_after_onset + age_numeric",
+        "Severity_onset_group_interaction" : "~ 0 + severity_onsetgroup2 + age_numeric",
         "Severity_onsetcontinous_interaction" : "~ group_per_sample:days_after_onset + group_per_sample + days_after_onset + age_numeric"
         }
 
 COEFFICIENTS = {
-        #"days_onset": {
-        #    "days_after_onset" : "days_after_onset",
-        #    "Age" : "age_numeric"},
-        #"Severity_onset_group_interaction" : {
-        #    "severe-mild_X_juncture-prejuncture" : "(severity_onsetgroup2severe_juncture17_23 - severity_onsetgroup2mild_juncture17_23) - (severity_onsetgroup2severe_prejuncture7_17 - severity_onsetgroup2mild_prejuncture7_17)",
-        #    #"juncture-early_in_PC1high": "PC1_onset_groupPC1_high_mid - PC1_onset_groupPC1_high_early",
-        #    #"mid-early_in_PC1low": "PC1_onset_groupPC1_low_mid - PC1_onset_groupPC1_low_early",
-        #    "severe-mild_juncture" : "severity_onsetgroup2severe_juncture17_23 - severity_onsetgroup2mild_juncture17_23",
-        #    "severe-mild_prejuncture" : "severity_onsetgroup2severe_prejuncture7_17 - severity_onsetgroup2mild_prejuncture7_17",
-        #    },
+        "days_onset": {
+            "days_after_onset" : "days_after_onset",
+            "Age" : "age_numeric"},
+        "Severity_onset_group_interaction" : {
+            "severe-mild_X_juncture-prejuncture" : "(severity_onsetgroup2severe_juncture17_23 - severity_onsetgroup2mild_juncture17_23) - (severity_onsetgroup2severe_prejuncture7_17 - severity_onsetgroup2mild_prejuncture7_17)",
+            "juncture-early_in_PC1high": "PC1_onset_groupPC1_high_mid - PC1_onset_groupPC1_high_early",
+            "mid-early_in_PC1low": "PC1_onset_groupPC1_low_mid - PC1_onset_groupPC1_low_early",
+            "severe-mild_juncture" : "severity_onsetgroup2severe_juncture17_23 - severity_onsetgroup2mild_juncture17_23",
+            "severe-mild_prejuncture" : "severity_onsetgroup2severe_prejuncture7_17 - severity_onsetgroup2mild_prejuncture7_17",
+            },
         "Severity_onsetcontinous_interaction" : {
             "days_onset_in_severe" : "group_per_samplesevereXdays_after_onset + days_after_onset",
             "days_onset_in_mild" : "days_after_onset",
             "diff_days_onset_severe-mild" : "group_per_samplesevereXdays_after_onset"
             }
-            #"Age" : "age_numeric"},
+            "Age" : "age_numeric"},
         }
 
 CELLTYPES = []
