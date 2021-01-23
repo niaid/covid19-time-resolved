@@ -30,55 +30,30 @@ SAMPLE_GROUPS = KEEP_TIMEPOINTS.keys()
 
 FORMULAS_T0_WHEALTHY = {
         "healthy_vs_covid": "~ Class + Age  + (1|Batch)",
-        "healthy_vs_severitygroup": "~ cond_group + Age  + (1|Batch)",
         }
 
 COEFFICIENTS_T0_WHEALTHY = {
         "healthy_vs_covid" : "ClassCOVID",
-        "healthy_vs_severitygroup" : ["cond_groupSevere", "cond_groupCritical"]
         }
 
 
-FORMULAS_COVID_TIMECOURSE = {"days_hospitalized": "~ days_since_hospitalized + Age + (1|Batch)",
+FORMULAS_COVID_TIMECOURSE = {
         "days_onset": "~ days_since_onset + Age + (1|Batch)",
-        "days_onsetXPC1" : "~ days_since_onset:PC1 + PC1 + days_since_onset + Age + (1|Batch)",
-        "days_onsetXPC2" : "~ days_since_onset:PC2 + PC2 + days_since_onset + Age + (1|Batch)",
-        "days_onsetXPLS1" : "~ days_since_onset:PLS1 + PLS1 + days_since_onset + Age + (1|Batch)",
-        "days_onsetXPC1_cat" : "~ days_since_onset:PC1_cat + PC1_cat + days_since_onset + Age + (1|Batch)",
-        "days_onsetXPC2_cat" : "~ days_since_onset:PC2_cat + PC2_cat + days_since_onset + Age + (1|Batch)",
-        "days_onsetXPLS1_cat" : "~ days_since_onset:PLS1_cat + PLS1_cat + days_since_onset + Age + (1|Batch)",
         }
 
-COEFFICIENTS_COVID_TIMECOURSE = {"days_hospitalized": "days_since_hospitalized",
+COEFFICIENTS_COVID_TIMECOURSE = {
         "days_onset": "days_since_onset",
-        "days_hospitalizedXseverity": "days_since_hospitalizedXseveritySevere", 
-        "days_onsetXPC1" : "days_since_onsetXPC1",
-        "days_onsetXPC2" : "days_since_onsetXPC2",
-        "days_onsetXPLS1" : "days_since_onsetXPLS1",
-        "days_hospitalizedXPC1_cat" : "days_since_hospitalizedXPC1_catPC1_high",
-        "days_hospitalizedXPC2_cat" : "days_since_hospitalizedXPC2_catPC2_high",
-        "days_hospitalizedXPLS1_cat" : "days_since_hospitalizedXPLS1_catPLS1_high"
         }
 
 
 FORMULAS_T0_COVID = {
-        "severity": "~ severity + days_since_onset + Age + (1|Batch)",
-        "severity.outcome": "~ severity.outcome + days_since_onset + Age + (1|Batch)",
         "PC1": "~ PC1 + days_since_onset + Age + (1|Batch)",
         "PC1_cat": "~ PC1_cat + days_since_onset + Age + (1|Batch)",
-        "PC2": "~ PC2 + days_since_onset + Age + (1|Batch)",
-        "PLS1": "~ PLS1 + days_since_onset + Age + (1|Batch)",
-        "t0crp": "~ T0_crp + days_since_onset + Age + (1|Batch)",
         }
 
 COEFFICIENTS_T0_COVID = {
-        "severity" : "severitySevere",
-        "severity.outcome" : ["severity.outcomeCritical-Deceased", "severity.outcomeCritical-alive", "severity.outcomeModerate-alive"],
-        "t0crp" : "T0_crp",
         "PC1" : "PC1",
         "PC1_cat" : "PC1_catPC1_high",
-        "PC2" : "PC2",
-        "PLS1" : "PLS1",
         }
 
 COEFFICIENTS = {
