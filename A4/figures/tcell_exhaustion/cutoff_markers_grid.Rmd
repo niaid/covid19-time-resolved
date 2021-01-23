@@ -1,0 +1,138 @@
+---
+title: "exhaustion marker coexpression t cell plot"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE, dev="CairoPNG"}
+knitr::opts_chunk$set(dev="CairoPNG")
+knitr::opts_knit$set(root.dir = normalizePath("../.."))
+```
+
+```{r}
+library(tidyverse)
+library(Seurat)
+library(Matrix)
+library(pheatmap)
+library(ggpubr)
+library(edgeR)
+
+source("figures/color_schemes.R")
+names(PC1class.color) <- gsub("PC1", "DSM", names(PC1class.color))
+SEURAT_IN_PATH <- "data/CITE5p/all_batches/2020_07_24.rmBuffSHD8.allcelltypelabels.merge.SNG.wmeta.WithinBatchClustered.Rds"
+
+EXPANDED_IN_PATH <- "data/CITE5p/all_batches/tcr/2020_07_28_tcell_expansion_df.tsv"
+
+#FIG_OUT_PATH <- "plots/CITE5p/all_batches/tcr/exhaustion/FIG4S.2020_09_16_exhaustion_surface_markers_single_cell_cutoff_grid_sorted.pdf"
+#dir.create(dirname(FIG_OUT_PATH))
+
+```
+
+```{r, fig.height = 5, fig.width = 9}
+obj <- readRDS(SEURAT_IN_PATH)
+
+expanded_dat <- read_tsv(EXPANDED_IN_PATH)
+
+prot <- GetAssayData(obj, assay = "CITE", slot = "data")
+meta <- obj@meta.data
+
+meta <- left_join(meta, expanded_dat)
+
+meta_cd8_mem <- meta %>% filter(WCTcoursecelltype == "CD8_Mem" & !is.na(expanded))
+
+cd8_mem_barcodes <- meta_cd8_mem$barcodeBatch
+
+prot_cd8_mem <- prot[, cd8_mem_barcodes]
+
+#See John Wherry's comment on first page of https://www.nature.com/articles/s41577-019-0221-9
+#see table figure 3 of https://www.nature.com/articles/nri3862
+
+markers <- c(PD1_CD279 = "CD279", TIM3_CD366 = "CD366", LAG3_CD223 = "CD223", 
+              TIGIT = "TIGIT", CTLA4_CD152 = "CD152",BTLA_CD272 = "CD272", 
+              `2B4_CD244` ="CD244")
+
+prot_cd8_mem <- prot_cd8_mem[markers, ]
+
+dat <- meta_cd8_mem %>% select(Class, Timepoint, Batch, barcodeBatch, Donor, PC1_cat, days_since_onset, Age, expanded, Sorted, nCount_CITE, PC1, severity.outcome)
+
+dat <- bind_cols(dat, as.data.frame(t(prot_cd8_mem)))
+
+dat_sorted <- dat %>% filter(Sorted == "Y" & expanded == TRUE & Batch != "B1") %>%
+        filter(!grepl("CHI", Donor))
+#dat_unsorted <- dat %>% filter(Sorted == "N")
+
+
+mat_sorted <- dat_sorted %>% 
+        select(markers) %>% 
+        as.matrix()
+rownames(mat_sorted) <- dat_sorted$barcodeBatch
+sorted_anno <- dat_sorted %>%
+        `rownames<-`(.$barcodeBatch) %>%
+        select(Donor, Class, PC1_cat, Batch)
+        
+#n_marker_cutoff <- 3
+plot_list <- list()
+#n_marker_cutoffs <- c(2,3,4)
+n_marker_cutoffs <- c(2,3)
+for(n_marker_cutoff in n_marker_cutoffs){
+  #for(cutoff in c(.5, 1, 1.5)){
+  for(cutoff in c(.5, 1, 1.5, 2)){
+    mat_sorted_cutoff <- (mat_sorted > cutoff) *1
+  
+    dat_sorted_cutoff <- dat_sorted %>%
+            mutate(n_markers_above_cutoff = rowSums(mat_sorted_cutoff)) %>%
+            mutate(exhausted = n_markers_above_cutoff >= n_marker_cutoff)
+    
+    plot_dat <- dat_sorted_cutoff %>%
+            filter(Timepoint %in% c("HC", "T0")) %>%
+            group_by(Donor, Timepoint, Batch, Class) %>%
+            summarise(n_exhausted = sum(exhausted),
+                      total = n(), 
+                      PC1 = unique(PC1),
+                      severity.outcome = unique(severity.outcome),
+                      PC1_cat = unique(PC1_cat)) %>%
+            mutate(severity.outcome = replace(as.character(severity.outcome), Class == "HC", "HC")) %>%
+            mutate(PC1_cat = replace(as.character(PC1_cat), Class == "HC", "HC")) %>%
+            mutate(PC1_cat = gsub("PC1", "DSM", PC1_cat)) %>%
+            mutate(PC1_cat = factor(PC1_cat, levels = c("HC", "DSM_low", "DSM_high"))) %>%
+            filter(!is.na(PC1_cat)) %>%
+            mutate(proportion_exhausted = n_exhausted / total) #%>%
+    #mutate(PC1_class = replace(PC1_cat, Class == "HC", "HC"))
+    
+    p <- ggplot(plot_dat, aes(x = PC1_cat, y = proportion_exhausted)) +
+    geom_boxplot(outlier.shape = NA, aes(color = PC1_cat)) +
+    geom_jitter(height = 0, aes(shape = severity.outcome, color = PC1_cat)) +
+    scale_color_manual(values = PC1class.color) +
+    scale_shape_manual(values = severity.shape) +
+    #stat_compare_means(ref.group = "HC") +
+    stat_compare_means(comparisons = list(c("HC", "DSM_low"), 
+                                          c("HC", "DSM_high"),
+                                          c("DSM_low", "DSM_high")), size = 2, vjust = 1) +
+    #stat_compare_means() +
+    theme_bw(base_size = 10) +
+    theme(legend.position = "none", plot.title = element_text(size = 8, face = "bold")) +
+    ggtitle(paste("Proportion cells at least", n_marker_cutoff,  "\nmarkers DSB counts >", cutoff)) +
+    xlab("DSM Class")
+    
+      plot_list[[paste0(n_marker_cutoff, "_", cutoff, "_vshealthy")]] <- p
+    
+    severity.color <- c("Critical-Alive"="#374E55FF","Critical-Deceased"="#DF8F44FF","Moderate-Alive"="#00A1D5FF" ,"Severe-Alive"="#B24745FF","Healthy" = "#79AF97FF")
+    #p <- ggplot(plot_dat, aes(x = PC1, y = proportion_exhausted)) +
+    #        geom_point(aes(color = severity.outcome), size = 4) +
+    #        stat_cor(method = "spearman", size = 2.5) +
+    #        theme_bw(base_size= 10) +
+    #        scale_color_manual(values = severity.color) +
+    #        theme(legend.position = "none", plot.title = element_text(size = 8, face = "bold")) +
+    #        ggtitle(paste("Proportion cells at least", n_marker_cutoff,  "\nmarkers DSB counts >", cutoff)) +
+    #        xlab("DSM")
+    #
+    #  plot_list[[paste0(n_marker_cutoff, "_", cutoff, "_vsseverity")]] <- p
+  
+  }
+}
+p_combined <- cowplot::plot_grid(plotlist = plot_list, ncol = 4)
+#ggsave(plot = p_combined, file = FIG_OUT_PATH, height = 5, width = 9)
+print(p_combined)
+```
+

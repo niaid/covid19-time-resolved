@@ -1,0 +1,235 @@
+---
+title: "Clonality association with severity"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE, dev="CairoPNG"}
+knitr::opts_chunk$set(dev="CairoPNG")
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+
+```{r}
+library(edgeR)
+library(pheatmap)
+library(GSVA)
+library(DESeq2)
+library(GGally)
+library(tidyverse)
+library(ggcorrplot)
+#library(corrplot)
+library(ggpubr)
+library(readxl)
+
+# This is generated in ../differential_expression/covid_de_pipeline_cell_freq
+ESET_TOTAL_IN_PATH <- "data/CITE5p/all_batches/differential_expression_cell_freq/2020_07_24/t0_plus_healthy/subsetted_expressionsets/WCT_course_pcnt_total-eset.rds"
+
+SCORES_IN_PATH <- "input/healthy_vs_covid_COVID-Healthy_module_score_gsva_filtered_samples_genes.rds"
+
+scores <- readRDS(SCORES_IN_PATH)
+eset_total <- readRDS(ESET_TOTAL_IN_PATH)
+
+GENESETS_IN_PATH <- "input/genesets/kegg_go_btm_reactome_foointerferon.rds"
+
+
+#cd8mem, mono classical, nkCD56hi
+
+#To get the interferon scores
+load("input/covid19.metadata.paper1.RData")
+ifn_dat <- covid19.lab.results %>% filter(test_name == "IFN-alpha2a") %>%
+        filter(!is.na(subject_id) & !is.na(test_time_point.PBMC)) %>%
+        filter(test_time_point.PBMC == "T0") %>%
+        select(subject_id, test_value) %>%
+        rename(`IFN-a2a (pg/mL)` = test_value)
+
+
+stopifnot(sum(duplicated(ifn_dat$subject_id)) == 0 )
+
+eset_total <- eset_total[, eset_total$Timepoint %in% c("HC", "T0")]
+pdat <- pData(eset_total)
+
+pdat <- left_join(pdat, ifn_dat, by =c("Donor" ="subject_id"))
+
+pdat <- pdat %>% mutate(sample = paste(Donor, Timepoint, Batch, sep = "_"))
+
+#pdat %>% write_tsv("data/ifn/sample_meta_w_ifna2a.tsv")
+
+# The names were previously Batch_Donor_timepoint, but I need Donor_Timepoint_Batch
+colnames(eset_total) <- with(pData(eset_total), paste(Donor, Timepoint, Batch, sep = "_"))
+pDC_dat <- enframe(exprs(eset_total)["pDC", ], name = "sample", value ="pDC_freq" )
+
+stopifnot(identical(pdat$sample, pDC_dat$sample))
+pDC_dat <- pDC_dat %>% mutate(log10_ifn_a2a = log10(as.numeric(pdat$`IFN-a2a (pg/mL)`) + .5))
+
+
+keep_celltypes <- c("CD8_Mem", "Mono_Classical", "NK_CD16hi", "pDC", "cDC")
+keep_celltypes_reduced <- c("CD8_Mem", "Mono_Classical", "NK_CD16hi")
+
+dat <- scores %>% mutate(cell_module = paste(celltype, pathway, sep = "_")) %>%
+        filter((pathway %in% c("GO_RESPONSE_TO_TYPE_I_INTERFERON", "reactome_Translation") & celltype %in% keep_celltypes )| (pathway == "GO_APOPTOTIC_SIGNALING_PATHWAY" & celltype == "pDC")) %>%
+        select(cell_module, sample, module.score) %>%
+        spread(key = cell_module, value = module.score)
+
+```
+
+```{r}
+dat <- left_join(pDC_dat, dat)
+
+dat_covid_only <- dat %>% filter(grepl("HGR", sample))
+
+mat_covid_only <- dat_covid_only %>%
+        select(-c("pDC_GO_RESPONSE_TO_TYPE_I_INTERFERON", "pDC_reactome_Translation",
+                  "cDC_GO_RESPONSE_TO_TYPE_I_INTERFERON", "cDC_reactome_Translation",)) %>%
+        `rownames<-`(.$sample) %>%
+        select(-sample) %>%
+        as.matrix()
+cormat_covid_only <- cor(mat_covid_only, method = "pearson", use = "pairwise.complete.obs")
+
+pmat <- cormat_covid_only
+
+
+for(x_name in rownames(pmat)){
+  for(y_name in colnames(pmat)){
+    pmat[x_name, y_name] <- 
+            cor.test(mat_covid_only[, x_name], mat_covid_only[, y_name], use = )$p.value
+  }
+}
+#Do a hack to show things for significant p values
+pmat <- 1 - pmat
+#set sig.level to .95
+```
+
+
+
+
+```{r}
+# if you would like to save pdfs
+#OUT_PREFIX <- "plots/CITE5p/all_batches/paper_figures/FIG3/2020_11_24/"
+#dir.create(OUT_PREFIX, recursive = TRUE)
+#
+#
+#out_path_list <- list(
+#                      EXPLORE = "cor_pDC_IFN_apoptosis.pdf",
+#                      CORMAT_PAPER = "Fig3_cor_pDC_IFN_apoptosis_cormat_for_paper.pdf",
+#                      APOPTOSIS_SCATTER = "Fig3_pDC_apoptosis_scatter_for_paper.pdf",
+#                      OXISTRESS_SCATTER = "Fig3_pDC_apoptosis_scatter_for_paper.pdf",
+#                      IFN_SCATTER = "Fig3_pDC_freq_nk_ifn_scatter.pdf",
+#                      IFN_CD8Mem_SCATTER = "FIG3_cd8mem_GO_IFN_scatter.pdf",
+#                      IFNSERUM_CD8Mem_SCATTER = "FIG3_cd8mem_ifn_serum_scatter.pdf",
+#                      IFNSERUM_PDC_SCATTER = "Fig3_pDC_freq_ifn_serum_scatter.pdf",
+#                      IFNSERUM_NKIFN_SCATTER = "Fig3_nkifn_ifn_serum_scatter.pdf",
+#                      IFN_TRANSLATION = "FIG3_ifn_translation_cor.pdf"
+#                      )
+#
+#out_path_list <- lapply(out_path_list, function(x){
+#  file.path(OUT_PREFIX, x)                      
+#})
+
+
+```
+
+```{r}
+#pdf(out_path_list$CORMAT_PAPER, height =9, width = 9)
+
+
+p <- ggcorrplot(cormat_covid_only, hc.order = TRUE, lab = FALSE, 
+                show.diag = FALSE, type = "upper", tl.cex = 9, 
+                p.mat = pmat, sig.level = .9499, pch =8, pch.cex = 2 ) +
+                #show.diag = TRUE, tl.cex = 9, p.mat = pmat) +
+    scale_x_discrete(position = "top") +
+    theme(axis.text.x=element_text(angle = 45, hjust = 0)) +
+    theme(plot.margin = margin(t = 0, r = 4, l = 0 , b = 0, "cm")) +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+print(p)
+#dev.off()
+```
+
+```{r}
+plot_dat <- dat_covid_only %>%
+        mutate(severity.outcome = paste(eset_total$severity, str_to_title(eset_total$outcome), sep = "-")[match(dat_covid_only$sample, colnames(eset_total))]) %>%
+        mutate(severity.outcome = as.character(severity.outcome)) %>%
+        mutate(severity.outcome = replace(severity.outcome, is.na(severity.outcome), "na"))
+
+
+```
+
+```{r, fig.heigh =5, fig.width = 6}
+severity.color <- c("Critical-Alive"="#374E55FF","Critical-Deceased"="#DF8F44FF","Moderate-Alive"="#00A1D5FF" ,"Severe-Alive"="#B24745FF","Healthy" = "#79AF97FF", "na" = "grey")
+p_apoptosis <- 
+        #ggplot(plot_dat %>% filter(!sample %in% unoverlap), aes(x = pDC_freq, y = pDC_GO_APOPTOTIC_SIGNALING_PATHWAY)) +
+        ggplot(plot_dat, aes(x = pDC_freq, y = pDC_GO_APOPTOTIC_SIGNALING_PATHWAY)) +
+        geom_point(aes(color = severity.outcome), size = 6) +
+        geom_smooth(method = "lm", se = FALSE) +
+        stat_cor(method = "pearson", vjust = 3) +
+        #stat_cor(method = "spearman", vjust = 3) +
+        scale_color_manual(values = severity.color) + theme_bw()
+
+#ggsave(plot = p_apoptosis, filename = out_path_list$APOPTOSIS_SCATTER, width =6, height = 5)
+print(p_apoptosis)
+
+p_ifn <- 
+        ggplot(plot_dat, aes(x = pDC_freq, y = NK_CD16hi_GO_RESPONSE_TO_TYPE_I_INTERFERON)) +
+        geom_point(aes(color = severity.outcome), size = 6) +
+        geom_smooth(method = "lm", se = FALSE) +
+        stat_cor(method = "pearson") +
+        #stat_cor(method = "spearman", vjust = 3) +
+        scale_color_manual(values = severity.color) + theme_bw()
+
+#ggsave(plot = p_ifn, filename = out_path_list$IFN_SCATTER, height = 5, width = 6)
+print(p_ifn)
+
+p_ifn_cd8mem <- 
+        ggplot(plot_dat, aes(x = pDC_freq, y = CD8_Mem_GO_RESPONSE_TO_TYPE_I_INTERFERON)) +
+        geom_point(aes(color = severity.outcome), size = 6) +
+        geom_smooth(method = "lm", se = FALSE) +
+        stat_cor(method = "pearson") +
+        #stat_cor(method = "spearman", vjust = 3) +
+        scale_color_manual(values = severity.color) + theme_bw()
+
+#ggsave(plot = p_ifn_cd8mem, filename = out_path_list$IFN_CD8Mem_SCATTER, height = 5, width = 6)
+print(p_ifn_cd8mem)
+
+p_ifn_serum_cd8mem <- 
+        ggplot(plot_dat, aes(x = log10_ifn_a2a, y = CD8_Mem_GO_RESPONSE_TO_TYPE_I_INTERFERON)) +
+        geom_point(aes(color = severity.outcome), size = 6) +
+        geom_smooth(method = "lm", se = FALSE) +
+        stat_cor(method = "pearson") +
+        #stat_cor(method = "spearman", vjust = 3) +
+        scale_color_manual(values = severity.color) + theme_bw()
+
+#ggsave(plot = p_ifn_serum, filename = out_path_list$IFNSERUM_CD8Mem_SCATTER, height = 5, width = 6)
+print(p_ifn_serum_cd8mem)
+
+p_ifn_serum_nk_ifn <- 
+        ggplot(plot_dat, aes(y = NK_CD16hi_GO_RESPONSE_TO_TYPE_I_INTERFERON, x = log10_ifn_a2a)) +
+        geom_point(aes(color = severity.outcome), size = 6) +
+        geom_smooth(method = "lm", se = FALSE) +
+        stat_cor(method = "pearson") +
+        #stat_cor(method = "spearman", vjust = 3) +
+        scale_color_manual(values = severity.color) + theme_bw()
+
+#ggsave(plot = p_ifn_serum_nk_ifn, filename = out_path_list$IFNSERUM_NKIFN_SCATTER, height = 5, width = 6)
+print(p_ifn_serum_nk_ifn)
+
+
+#pdf(file = out_path_list$IFN_TRANSLATION, height = 5, width = 6)
+for(celltype in keep_celltypes){
+        x_string <- paste(celltype, "GO_RESPONSE_TO_TYPE_I_INTERFERON", sep = "_")
+        y_string <- paste(celltype, "reactome_Translation", sep = "_")
+p <- 
+        ggplot(plot_dat, aes_string(x = x_string, y = y_string)) +
+        geom_point(aes(color = severity.outcome), size = 6) +
+        geom_smooth(method = "lm", se = FALSE) +
+        stat_cor(method = "pearson") +
+        #stat_cor(method = "spearman", vjust = 3) +
+        scale_color_manual(values = severity.color) + theme_bw()
+print(p)
+
+}
+#dev.off()
+
+```
+
+

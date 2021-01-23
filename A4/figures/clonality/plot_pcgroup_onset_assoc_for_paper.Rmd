@@ -1,0 +1,61 @@
+---
+title: "Clonality association with severity"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE, dev="CairoPNG"}
+knitr::opts_chunk$set(dev="CairoPNG")
+knitr::opts_knit$set(root.dir = normalizePath("../.."))
+```
+
+```{r}
+library(tidyverse)
+
+source("figures/color_schemes.R")
+
+#output from clonality pipeline
+CD8MEM_SORTED_IN_PATH <- "data/CITE5p/all_batches/tcr/diversity_pipeline/2020_07_30/diversity_metrics/CD8_Mem-Sorted_diversity.rds"
+
+#Metadata
+META_IN_PATH <- "data/CITE5p/all_batches/tcr/diversity_pipeline/2020_07_30/sample_meta.tsv"
+
+meta <- read_tsv(META_IN_PATH)
+
+diversity_dat <- readRDS(CD8MEM_SORTED_IN_PATH)
+
+combined_dat <- left_join(diversity_dat, meta)
+
+combined_dat <- combined_dat %>%
+        mutate(PC1_cat = as.character(PC1_cat)) %>%
+        mutate(PC1_cat = replace(PC1_cat, Class == "HC", "HC")) %>%
+        mutate(PC1_cat= factor(PC1_cat, levels = c("HC", "PC1_low", "PC1_high"))) %>%
+        filter(!is.na(PC1_cat)) %>%
+        filter(measure == "simpson") %>%
+        filter(!grepl("CHI", Donor))
+```
+
+```{r}
+# If would like to save pdf instead
+#FIG_OUT_PATH <- "plots/CITE5p/all_batches/paper_figures/FIG4/2020_09_04/fig4_clonality_boxplots.pdf"
+#dir.create(dirname(FIG_OUT_PATH))
+#pdf(FIG_OUT_PATH, height =2.5, width = 4)
+
+
+p2 <- combined_dat %>% 
+        filter(Timepoint %in% c("HC", "T0")) %>%
+        ggplot(aes(x = PC1_cat, y = median1000, color = PC1_cat)) +
+        geom_boxplot(outlier.shape = NA) +
+        geom_jitter(height = 0, aes(shape = severity.outcome2), size = 3) +
+        scale_shape_manual(values = severity.shape) +
+        scale_color_manual(values = PC1class.color) +
+        theme_bw() +
+        ylab("Clonality (Simpson Index)") +
+        ggtitle("Clonality in Sorted CD8 Mem")
+print(p2)
+
+#dev.off()
+```
+
+

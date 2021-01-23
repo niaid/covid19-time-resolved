@@ -1,0 +1,85 @@
+---
+title: "NK fatty acid validation"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE, dev="CairoPNG"}
+knitr::opts_chunk$set(dev="CairoPNG")
+knitr::opts_knit$set(root.dir = normalizePath("../.."))
+```
+
+```{r}
+library(tidyverse)
+library(viridis)
+library(fgsea)
+library(cowplot)
+
+FIG_fgsea_OUT_PATH <- "plots/validations/SchulteSchrepping/nk_fatty_acid/nk_fatty_acid_cohorts_1and2_severe-mild.pdf"
+dir.create(dirname(FIG_fgsea_OUT_PATH), recursive = TRUE)
+
+GENESETS_IN_PATH <- "input/genesets/kegg_go_btm_reactome_foointerferon.rds"
+
+genesets <- readRDS(GENESETS_IN_PATH)
+
+COHORT1_PATH <- "data/externalData/SchulteSchrepping/differential_expression/sample_groups/t0_covid_only/results/severity/fgsea_tables/severe-mild/id.celltype/15_NK cells--model@severity--coef@severe-mild--fgsea.tsv"
+COHORT2_PATH <- "data/externalData/SchulteSchrepping/differential_expression_cohort2/sample_groups/t0_covid_only/results/severity/fgsea_tables/severe-mild/cluster_labels_res.0.4/NK cells--model@severity--coef@severe-mild--fgsea.tsv"
+
+```
+
+```{r fig.width =8, fig.height = 4}
+files <- list(cohort1 = COHORT1_PATH, cohort2 = COHORT2_PATH)
+
+fgsea_list <- lapply(files, function(path){
+  read_tsv(path,
+           col_types = cols(
+                       pathway = col_character(),
+                       pval = col_double(),
+                       padj = col_double(),
+                       ES = col_double(),
+                       NES = col_double(),
+                       nMoreExtreme = col_double(),
+                       size = col_double(),
+                       leadingEdge = col_character()
+                       ))
+})
+#names(fgsea_list) <- sapply(strsplit(files, "\\/"), `[[`, 7)
+
+
+COHORT1_TOPTAB_PATH <- "data/externalData/SchulteSchrepping/differential_expression/sample_groups/t0_covid_only/results/severity/toptables/severe-mild/id.celltype/15_NK cells--model@severity--coef@severe-mild--toptab.tsv"
+COHORT2_TOPTAB_PATH <- "data/externalData/SchulteSchrepping/differential_expression_cohort2/sample_groups/t0_covid_only/results/severity/toptables/severe-mild/cluster_labels_res.0.4/NK cells--model@severity--coef@severe-mild--toptab.tsv"
+
+toptab_files <- list(cohort1 = COHORT1_TOPTAB_PATH, cohort2 = COHORT2_TOPTAB_PATH)
+
+toptab_list <- lapply(toptab_files, function(path){
+                              read_tsv(path)
+
+})
+
+
+keep_pathways <- list("reactome_Fatty acid metabolism")
+
+plot_list <- list()
+for(cohort in c("cohort1", "cohort2")){
+  for(path in unique(keep_pathways)){
+    pval <- fgsea_list[[cohort]] %>% filter(pathway == path) %>% pull(pval) %>%
+            round(5)
+    ranks <- toptab_list[[cohort] ]%>%
+            select(gene, t) %>%
+            deframe()
+    plot_list[[paste(cohort, path, sep = "_")]] <- 
+            plotEnrichment(stats = ranks, pathway = genesets[[path]]) +
+            ylim(c(-.6, .6)) +
+            ggtitle(paste(cohort, "Severe - Mild", path, sep = "\n")) +
+             annotate("text",  x=Inf, y = Inf, label = paste("p =", pval), vjust=1, hjust=1)
+  }
+
+}
+#combined_dat %>% filter(pathway == path & coef == coeff.) %>% as.data.frame()
+p <- plot_grid(plotlist = plot_list, ncol = 2)
+print(p)
+#ggsave(plot = p, filename = FIG_fgsea_OUT_PATH, width = 8, height =4)
+```
+
+
