@@ -1,0 +1,26 @@
+cellgroup,celltype
+Bcell,B_Mem
+Bcell,B_Naive
+Bcell,gated B_CD71
+Bcell,gated Plasmablast
+CD8,CD8_Mem
+CD8,CD8_Naive
+CD4,CD4_Mem
+CD4,CD4_Naive
+CD4,gated Tfh
+CD4,gated Treg
+CD4,Treg
+OtherTcell,MAIT
+OtherTcell,DNT
+OtherTcell,DPT
+OtherTcell,gammadeltaT
+NK,NK_CD16hi
+NK,NK_CD56hiCD16lo
+NK,NK_CD56loCD16lo
+Mono,Mono_Classical
+Mono,Mono_Intermediate
+Mono,Mono_NonClassical 
+Gran,Granulocytes
+DC,cDC
+DC,pDC
+Platelet,Platelets
