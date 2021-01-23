@@ -44,7 +44,7 @@ rule all:
         
 rule pseudobulk_pool:
     input:
-        seurat="data/CITE5p/all_batches/2020_08_09.rmBuffSHD8.allcelltypelabels.merge.SNG.wmeta.WithinBatchClustered.Rds"
+        seurat="input/brescia_paper1_seurat.rds"
     output:
         "all_samples/pseudobulk_dgelists_unfiltered/{sort_group}-{cell_annotation}.rds"
     params:
