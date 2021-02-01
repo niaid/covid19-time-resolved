@@ -27,7 +27,7 @@ load(file.path(data.folder,"covid19.metadata.paper1.RData"),verbose = T)
 ```
 
 ### Overview
-```{r overiew,fig.cap=c("Fig 1A","Fig S1"),fig.height=10,out.width=800}
+```{r dist,fig.cap="Fig 1A",fig.height=2,out.width=800}
 batch.subjects <- unique(subset(covid19.samples,!is.na(batch))$subject_id)
 batch.samples <- subset(covid19.samples,material_type == "PBMC" & subject_id %in% batch.subjects)
 batch.samples <- batch.samples[order(batch.samples$days_from_admission_to_sample_drawn),]
@@ -56,6 +56,14 @@ batch.subject.ordered.by.admission$subject_id_alt <- factor(batch.subject.ordere
 
 batch.samples$subject_id_alt <- batch.subject.ordered.by.admission[batch.samples$subject_id,"subject_id_alt"]
 
+# sample distribution
+tso.dist <- hist(batch.samples$days_from_symptom_onset_to_sample_drawn,breaks = seq(0,51,3),plot = F)
+ggplot(data.frame(x=tso.dist$mids,count=tso.dist$counts),aes(x,count)) + 
+  geom_bar(stat="identity",fill="#00BFC4", color="white", alpha = 0.6) +  xlab("days since symptom onset") + ylab("Sample Count") + 
+  theme_classic() + theme(text=element_text(size=6))
+```
+
+```{r overiew,fig.cap=c("Fig 1A","Fig S1A"),fig.height=10,out.width=800}
 # move T1 to T0 for those without T0
 #batch.samples[batch.samples$subject_id %in% setdiff(batch.subjects,subset(batch.samples,visit == "T0")$subject_id),"visit"] <- "T0"
 # subjects whose first sample was >= 30 days since symptom onset
