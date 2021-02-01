@@ -68,7 +68,7 @@ batch.sample.lab.values.avg[is.na(batch.sample.lab.values.avg$days_from_symptom_
 ```
 
 ### Clinical and cytokine parameters at first time point
-```{r initial.timepoint,out.width="800px",fig.height=6}
+```{r sample.selection}
 batch.sample.lab.values.avg.T0 <- batch.sample.lab.values.avg[!duplicated(batch.sample.lab.values.avg$subject_id),]
 batch.sample.lab.values.avg.T0$severity.outcome <- paste0(batch.sample.lab.values.avg.T0$severity,"-",batch.sample.lab.values.avg.T0$outcome)
 severity.color <- ggsci::pal_jama()(4)
@@ -87,7 +87,9 @@ batch.sample.lab.values.avg.T0 <- subset(batch.sample.lab.values.avg.T0,days_fro
 ggplot(batch.sample.lab.values.avg.T0,aes(visit,days_from_admission_to_test)) + geom_boxplot(outlier.shape = NA,width=0.5) + 
   geom_point(pch=21,size=3,alpha=0.75,position = position_jitter(w=0.25,h=0),aes(fill=severity.outcome)) + 
   theme_bw() + ggsci::scale_fill_jama() + ylab("Days from Hospital Admission")
+```
 
+```{r initial.timepoint,out.width="800px",fig.height=6}
 batch.sample.lab.values.avg.T0.meta <- batch.sample.lab.values.avg.T0[,setdiff(colnames(batch.sample.lab.values.avg.T0),unique(batch.sample.lab.values$test_id))]
 rownames(batch.sample.lab.values.avg.T0.meta) <- batch.sample.lab.values.avg.T0.meta$subject_id
 batch.sample.lab.values.avg.T0.meta$severity.outcome <- paste0(batch.sample.lab.values.avg.T0.meta$severity,"-",batch.sample.lab.values.avg.T0.meta$outcome)
@@ -146,7 +148,8 @@ pheatmap::pheatmap(scale(batch.sample.lab.values.expanded.avg),
                    main="All earliest time-point batch samples (values from time point +/- 2 days)")
 
 # impute remaining missing data
-RNGkind(sample.kind = "Rounding") # ensure compatibility with versions prior to 3.6
+if (as.numeric(paste0(R.version$major,".",floor(as.numeric(R.version$minor)))) >= 3.6)
+  RNGkind(sample.kind = "Rounding") # ensure compatibility with versions prior to 3.6
 #set.seed(10276)
 set.seed(1087)
 batch.sample.lab.values.expanded.avg.imputed <- batch.sample.lab.values.expanded.avg
@@ -205,7 +208,7 @@ pheatmap::pheatmap(scale(batch.sample.lab.values.expanded.avg.imputed.corrected)
                    labels_col = parameter.labels[colnames(batch.sample.lab.values.expanded.avg.imputed.corrected),"test_name"])
 ```
 
-# Classification model
+### Classification model
 Select features associated with severity and use them to calculate DSM
 ```{r model}
 severity.index <- c("Moderate-Alive"=1,"Severe-Alive"=2,"Critical-Alive"=3,"Critical-Deceased"=4)
@@ -298,10 +301,7 @@ ggviolin(row.annotation,x="severity.outcome",y="PC1", add = "boxplot",palette = 
 rownames(row.annotation) <- row.annotation$Row.names
 ```
 
-
-### Serology for batch samples
-add serology data and create dsm object
-```{r}
+```{r, serology}
 # serology at time point
 serology.values <- subset(covid19.lab.results,test_type == "Serology")
 serology.values$severity.outcome <- paste0(serology.values$severity,"-",serology.values$outcome)
@@ -369,10 +369,11 @@ ggplot(subset(who.score.df,!is.na(DSM.group)),aes(days_from_symptom_onset_to_sam
 # DSM v. WHO Scores
 dsm.who.association <- merge(patient.data,who.score.df[,c("sample_label","visit","WHO.ordinal.scale.at.time.of.sampling")],
                                 by=c("sample_label","visit"),all.x=T)
+test.res <- clinfun::jonckheere.test(dsm.who.association$PC1,dsm.who.association$WHO.ordinal.scale.at.time.of.sampling,alternative = "increasing")
 ggplot(dsm.who.association,aes(as.factor(WHO.ordinal.scale.at.time.of.sampling),PC1)) + geom_boxplot(outlier.shape = NA) +
   geom_jitter(alpha=0.75,size=2,pch=21,aes(fill=severity.outcome),width=0.1,height=0) + xlab("WHO Severity Score") + ylab("DSM") +
-  stat_compare_means() +
-  scale_fill_manual(name="Severity-Outcome",values=severity.color) + theme_bw() + ylim(-3,4.5)
+  scale_fill_manual(name="Severity-Outcome",values=severity.color) + theme_bw() + ylim(-3,4.5) + 
+  annotate(geom="text", x=2, y=4, label=sprintf("Jonckheere-Terpstra, p=%.3e",test.res$p.value),color="black",size=3)
 
 dsm.who.association$WHO.severity <- "Mild"
 dsm.who.association[dsm.who.association$WHO.ordinal.scale.at.time.of.sampling >= 5,"WHO.severity"] <- "Severe"

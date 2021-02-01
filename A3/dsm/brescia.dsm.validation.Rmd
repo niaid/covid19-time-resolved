@@ -10,7 +10,7 @@ editor_options:
 Validate DSM association with disease severity using Brescia cohort not in the citeseq
 ```{r setup, include=FALSE}
 input.folder <- "input.data"
-data.folder <- "output/DSM"
+data.folder <- "output/dsm"
 library(knitr)
 library(ggplot2)
 library(ggsci)
@@ -120,7 +120,7 @@ colSums(is.na(selected.lab.values.expanded.avg.filtered))
 ```
 
 ### Data Transformation
-```{r transform, out.width="800px",fig.height=8}
+```{r transform, out.width="800px"}
 # transform to log10
 selected.lab.values.expanded.avg.filtered <- log10(selected.lab.values.expanded.avg.filtered+0.01)
 
@@ -129,11 +129,13 @@ severity.color <- ggsci::pal_jama()(4)
 names(severity.color) <- sort(unique(covid19.patient.demo[selected.patients,]$severity.outcome))
 pheatmap::pheatmap(as.matrix(scale(selected.lab.values.expanded.avg.filtered)),
                    annotation_row = covid19.patient.demo[selected.patients,c("severity.outcome"),drop=F],
-                   color = viridis::inferno(64),breaks=c(-6,seq(-3,3,by=0.1),6),fontsize = 6,
+                   color = viridis::inferno(64),breaks=c(-6,seq(-3,3,by=0.1),6),
                    annotation_colors = list(sex=c("F"="darkred","M"="darkblue"),severity.outcome=severity.color),
                    main="All earliest time-point batch samples (values from time point +/- 2 days)")
 
 # impute remaining missing data
+if (as.numeric(paste0(R.version$major,".",floor(as.numeric(R.version$minor)))) >= 3.6)
+  RNGkind(sample.kind = "Rounding") # ensure compatibility with versions prior to 3.6
 #set.seed(1087)
 set.seed(10276)
 selected.lab.values.expanded.avg.imputed <- selected.lab.values.expanded.avg.filtered
@@ -144,7 +146,7 @@ selected.lab.values.expanded.avg.imputed[names(imputed.values)] <- imputed.value
 
 pheatmap::pheatmap(as.matrix(scale(selected.lab.values.expanded.avg.imputed)),
                    annotation_row = covid19.patient.demo[selected.patients,c("severity.outcome"),drop=F],
-                   color = viridis::inferno(64),breaks=c(-6,seq(-3,3,by=0.1),6),fontsize = 6,
+                   color = viridis::inferno(64),breaks=c(-6,seq(-3,3,by=0.1),6),
                    annotation_colors = list(sex=c("F"="darkred","M"="darkblue"),severity.outcome=severity.color),
                    main="All earliest time-point batch samples (values from time point +/- 2 days or imputed)")
 
@@ -152,19 +154,13 @@ pheatmap::pheatmap(as.matrix(scale(selected.lab.values.expanded.avg.imputed)),
 correct.for <- cytokine.measurements.earliest.30days.optimized[match(rownames(selected.lab.values.expanded.avg.imputed),
                                                            cytokine.measurements.earliest.30days.optimized$subject_id),
                                                      "days_from_admission_to_test"]
-correct.for.alt <- cytokine.measurements.earliest.30days.optimized[match(rownames(selected.lab.values.expanded.avg.imputed),
-                                                           cytokine.measurements.earliest.30days.optimized$subject_id),
-                                                     "days_from_symptom_onset_to_test"]
 selected.lab.values.expanded.avg.imputed.corrected <- t(limma::removeBatchEffect(t(selected.lab.values.expanded.avg.imputed),
                   covariates = correct.for))
-selected.lab.values.expanded.avg.imputed.corrected.alt <- t(limma::removeBatchEffect(t(selected.lab.values.expanded.avg.imputed),
-                  covariates = correct.for.alt))
-#batch.sample.lab.values.expanded.avg.imputed.corrected <- batch.sample.lab.values.expanded.avg.imputed.corrected.alt <- batch.sample.lab.values.expanded.avg.imputed
 
 ```
 
 ### DSM calculation
-```{r dsm, fig.cap="Fig 1E",out.width=800}
+```{r dsm, fig.cap=c("Fig 1E","Fig S1C"),out.width=800}
 dsm.paramaters <- c("SpO2.FiO2_.ratio","IL.6","IL.13","TNF.b","ANC.ALC.Ratio_.ratio","IP.10","D.Dimer_ng.mL",
                     "Lymphocytes_x10.3.uL","Lactate.Dehydrogenase.LDH_U.L")
 
@@ -180,9 +176,9 @@ comparisons <- gtools::combinations(4,2,names(severity.color))
 comparisons <- comparisons[comparisons[,1] != comparisons[,2],]
 comparisons <- lapply(1:nrow(comparisons),function(x){comparisons[x,]})
 # ggviolin(cytokine.measurements.earliest.30days.pc,x="severity.outcome",y="PC1", add = "boxplot",palette = c("#00A1D5FF","#B24745FF","#374E55FF","#DF8F44FF"),
-#          fill="severity.outcome",add.params = list(fill="white"),xlab = "Severity-Outcome",ylab="Disease Severity Metric (DSM)") + 
-#   geom_point(alpha=0.25,size=2) + 
-#   stat_compare_means(comparisons = comparisons,hide.ns = T,label = "p.signif",tip.length = 0,method = "wilcox.test") + 
+#          fill="severity.outcome",add.params = list(fill="white"),xlab = "Severity-Outcome",ylab="Disease Severity Metric (DSM)") +
+#   geom_point(alpha=0.25,size=2) +
+#   stat_compare_means(comparisons = comparisons,hide.ns = T,label = "p.signif",tip.length = 0,method = "wilcox.test") +
 #   theme(text = element_text(size=8))
 
 variables <- c("subject_id","PC1","severity","outcome")
@@ -199,6 +195,15 @@ ggplot(combined.dsm,aes(severity.outcome,PC1)) + geom_boxplot(aes(fill=severity.
   scale_fill_manual(values=severity.color) +
   theme_classic2() + theme(text = element_text(size=8),axis.text.x = element_text(angle=45,hjust = 1)) + 
   ylab("Disease Severity Metric (DSM)") + xlab("") 
+
+tmp <- rbind(cbind(type="All",cytokine.measurements.earliest.30days.pc),
+             cbind(type="Critical-Alive Only",subset(cytokine.measurements.earliest.30days.pc,severity.outcome=="Critical-Alive")))
+ggplot(tmp,aes(ever_admitted_to_icu,PC1)) + geom_boxplot(outlier.shape = NA) + 
+  geom_jitter(aes(fill=severity.outcome),pch=21,width=0.2,height=0,size=2,alpha=0.75) + theme_bw() + scale_fill_manual(values=severity.color) + 
+  ylab("DSM") + xlab("ICU Admission") + stat_compare_means(size=3) + theme(text=element_text(size=7)) +
+  facet_grid(~type)
+
+
 ```
 
 ### Session Info
