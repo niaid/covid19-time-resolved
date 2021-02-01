@@ -1,0 +1,269 @@
+---
+title: "Classification of Brescia Deceased vs. Recovered"
+output: 
+  html_document:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+Compare cytokine profiles between deceased patients and those with good outcome. Specific focus on 17-23 days since symptom onset.
+```{r setup, include=FALSE}
+data.folder <- "input.data"
+output.folder <- "output"
+library(knitr)
+library(ggplot2)
+library(ggsci)
+library(ggpubr)
+library(ggfortify)
+library(mgcv)
+library(tidymv)
+library(lme4)
+library(lmerTest)
+library(plsRglm)
+library(precrec)
+knitr::opts_chunk$set(echo = TRUE)
+options(stringsAsFactors = FALSE)
+opts_knit$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache.lazy = FALSE)
+
+source("critical.juncture/juncture.protein.search.R")
+
+# parallel processing for permutation test
+library(BiocParallel)
+library(parallel)
+library(foreach)
+num.workers <- 60
+if (!exists("cl")) {
+  register(MulticoreParam(num.workers, progressbar = FALSE))
+  cl <- parallel::makeForkCluster(num.workers,outfile="cluster.log.txt")
+  doParallel::registerDoParallel(cl)
+  cat("Number of workers started: ",getDoParWorkers(),"\n")
+}
+
+if (as.numeric(paste0(R.version$major,".",floor(as.numeric(R.version$minor)))) >= 3.6)
+  RNGkind(sample.kind = "Rounding") # ensure compatibility with versions prior to 3.6
+```
+
+### Create sub-cohort
+Identify all deceased patients and match them with critical but recovered patients by age and gender (excluding those staying hospitalized for more than 50 days).
+Patients in the citiseq cohort can optionally be excluded.
+```{r read.data}
+load(file.path(data.folder,"covid19.metadata.paper1.RData"),verbose=F)
+covid19.lab.results$severity.outcome <- paste0(covid19.lab.results$severity,"-",covid19.lab.results$outcome)
+
+severity.color <- c("Critical-Alive"="#374E55FF","Critical-Deceased"="#DF8F44FF","Moderate-Alive"="#00A1D5FF" ,"Severe-Alive"="#B24745FF","HC" = "#79AF97FF")
+
+deceased.patients.cytokines <- subset(covid19.lab.results,outcome == "Deceased" & test_type == "ELISA" & !is.na(days_from_symptom_onset_to_test))
+deceased.patients <- unique(deceased.patients.cytokines$subject_id)
+
+cat("Map of sampling TSO time points for deceased patients:\n")
+deceased.time.points <- as.data.frame.matrix(table(deceased.patients.cytokines[,c("subject_id","days_from_symptom_onset_to_test")])) 
+colSums(deceased.time.points > 0)
+cat("Age and sex distribution:\n")
+table(subset(covid19.patient.demo,subject_id %in% deceased.patients)$sex)
+summary(subset(covid19.patient.demo,subject_id %in% deceased.patients)$age)
+
+# recovered patients with similar age and sex
+age.tol <- 3
+recovered.patients <- c()
+for (i in deceased.patients) {
+  target.age <- covid19.patient.demo[i,"age"]
+  target.sex <- covid19.patient.demo[i,"sex"]
+  cat("Target age:",target.age,"sex:",target.sex,"\n")
+  tmp <- subset(covid19.lab.results,outcome != "Deceased" & test_type == "ELISA" & !is.na(days_from_symptom_onset_to_test) & 
+           age >= target.age - age.tol & age <= target.age + age.tol & severity == "Critical" & sex == target.sex & 
+             days_from_symptom_onset_to_test > 15 & days_from_symptom_onset_to_test <= 25 &
+           number_of_days_hospitalized < 50)
+
+  matched.subject <- unique(tmp$subject_id)
+  cat("Matched subject:",matched.subject,"\n")
+  recovered.patients <- c(recovered.patients,matched.subject)
+}
+recovered.patients <- unique(recovered.patients[!is.na(recovered.patients)])
+recovered.patients.cytokines <- subset(covid19.lab.results,test_type == "ELISA" & subject_id %in% recovered.patients)
+cat("Map of samping TSO time points for recovered patients:\n")
+recovered.time.points <- as.data.frame.matrix(table(recovered.patients.cytokines[,c("subject_id","days_from_symptom_onset_to_test")])) 
+colSums(recovered.time.points > 0)
+cat("Age and sex distribution:\n")
+table(subset(covid19.patient.demo,subject_id %in% recovered.patients)$sex)
+summary(subset(covid19.patient.demo,subject_id %in% recovered.patients)$age)
+
+selected.cytokine.profiles <- rbind(deceased.patients.cytokines,recovered.patients.cytokines)
+# remove patients in citeseq
+#citeseq.patients <- subset(covid19.samples,!is.na(batch))$subject_id
+#intersect(citeseq.patients,c(recovered.patients,deceased.patients))
+#selected.cytokine.profiles <- subset(selected.cytokine.profiles,!(subject_id %in% citeseq.patients)) 
+parameter.labels <- unique(selected.cytokine.profiles[,c("test_id","test_name")])
+rownames(parameter.labels) <- parameter.labels$test_id
+parameter.labels$test_name <- gsub("/ ","/",parameter.labels$test_name,fixed = T)
+```
+
+
+### Grouping of samples
+Separate samples into interval groups relative to juncture: early (7-16 days), mid (juncture/17-23 days), and late (24-30 days)
+```{r build}
+selected.cytokine.profiles$unique.id <- make.unique(apply(selected.cytokine.profiles[,c("subject_id","days_from_admission_to_test","test_id")],1,
+                                                          paste0,collapse="."),sep = "|")
+selected.cytokine.profiles$unique.id <- sapply(selected.cytokine.profiles$unique.id,function(x){unlist(strsplit(x,"|",fixed=T))[2]})
+selected.cytokine.profiles.matrix <- reshape2::dcast(selected.cytokine.profiles,
+                                                     subject_id + age + sex + outcome + severity + days_from_symptom_onset_to_test + unique.id ~ test_id,
+                                                     value.var = "test_value")
+selected.cytokine.profiles.matrix[,colnames(selected.cytokine.profiles.matrix) %in% selected.cytokine.profiles$test_id] <-
+  apply(selected.cytokine.profiles.matrix[,colnames(selected.cytokine.profiles.matrix) %in% selected.cytokine.profiles$test_id],2,function(x){scale(log10(x+1))})
+selected.cytokine.profiles.matrix$stage <- NA
+tmp <- which(selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test >= 7 & selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test <= 16)
+selected.cytokine.profiles.matrix[tmp,"stage"] <- "early"
+tmp <- which(selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test >= 17 & selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test <= 23)
+selected.cytokine.profiles.matrix[tmp,"stage"] <- "mid"
+tmp <- which(selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test >= 24 & selected.cytokine.profiles.matrix$days_from_symptom_onset_to_test <= 30)
+selected.cytokine.profiles.matrix[tmp,"stage"] <- "late"
+
+cat("Sample distribution:\n")
+table(selected.cytokine.profiles.matrix[,c("outcome","stage")])
+```
+<br/>
+    
+### Outcome Prediction 
+Search for divergent proteins around juncture using the following model:
+
+Differential expression: 
+test_value ~ outcome + age.numeric + sex + DFSO + (1|subject_id), for samples within each stage to identify cytokines
+with sig. differences between the two outcome groups
+
+Do leave-one-out cross validation by holding out one patient in each round for testing
+```{r predict}
+# leave-one-out modeling
+sample.scores <- data.frame()
+feature.importance <- data.frame()
+selected.cytokine.profiles.matrix$outcome.numerical <- 0
+selected.cytokine.profiles.matrix[selected.cytokine.profiles.matrix$outcome == "Deceased",]$outcome.numerical <- 1
+for (i in unique(selected.cytokine.profiles.matrix$subject_id)) {
+  train.data <- subset(selected.cytokine.profiles.matrix,subject_id != i)
+  test.data <- subset(selected.cytokine.profiles.matrix,subject_id == i)
+  
+  # feature selection
+  search.results <- juncture.divergent.proteins(train.data,pval.cutoff = 1)
+
+  # modeling
+  for (s in c("mid","late")) {
+    pls.train.data <- subset(train.data,stage == s)
+    pls.test.data <- subset(test.data,stage == s)
+    sig.did.de.df <- subset(search.results$type1,de.pval.1 <= 0.05 & 
+                                 did.pval.test.intervalTRUE.outcomeDeceased <= 0.05 & stage == s) # DE & sig. delta 
+    if (nrow(pls.test.data) > 0 & nrow(pls.train.data) > 0) {
+      modpls2 <-plsRglm(dataY=pls.train.data$outcome.numerical,dataX=pls.train.data[,sig.did.de.df$cytokine],
+                        nt=1,modele="pls-glm-logistic",pvals.expli = T,
+                      dataPredictY = pls.test.data[,sig.did.de.df$cytokine,drop=F],sparse = F,verbose = F)
+      sample.scores <- rbind(sample.scores,data.frame(stage=s,sample=pls.test.data[,
+                                                    c("subject_id","days_from_symptom_onset_to_test","stage","outcome")],
+                                                    predicted=modpls2$ValsPredictY,
+                                                    observed=pls.test.data[,"outcome.numerical"]))
+      feature.importance <- dplyr::bind_rows(feature.importance,data.frame(stage=s,t(modpls2$Std.Coeffs)))
+    }
+  }
+}
+# performance
+cat("Performance at juncture:\n")
+precrec_obj_mid <- evalmod(scores = subset(sample.scores,stage=="mid")$predicted,labels = subset(sample.scores,stage=="mid")$observed)
+precrec_obj_mid
+cat("Performance post-juncture:\n")
+precrec_obj_late <- evalmod(scores = subset(sample.scores,stage=="late")$predicted,labels = subset(sample.scores,stage=="late")$observed)
+precrec_obj_late
+#precrec_obj <- evalmod(scores = sample.scores$predicted,labels = sample.scores$observed)
+#autoplot(precrec_obj)
+
+# ROC plot
+roc.curve.all <- rbind(data.frame(type="mid",x=precrec_obj_mid$rocs[[1]]$x,y=precrec_obj_mid$rocs[[1]]$y),
+                       data.frame(type="late",x=precrec_obj_late$rocs[[1]]$x,y=precrec_obj_late$rocs[[1]]$y))
+ggplot(roc.curve.all,aes(x,y,color=type)) + geom_path(size=1.5,alpha=0.95) + theme_bw() +
+ geom_abline(slope=1,intercept = 0,linetype="dashed",color="grey30") +
+ xlab("1-Specificity") + ylab("Sensitivity") + scale_color_manual(labels=c("Post-Juncture","Juncture"),values=c("lightblue","#EADCFA"))
+```
+
+### Permutation
+Calculate permutation-based p-value of classification performance by permuting the patient labels
+```{r permute, eval=F}
+# permute labels
+num.perm <- 1000
+protein.search.res.permuted <- mclapply(which(sapply(permuted.auc,is.null)==T),function(j) {
+  set.seed(j)
+  cat("Round",j,"\n")
+  selected.cytokine.profiles.permute <- selected.cytokine.profiles.matrix
+  subject.outcome <- unique(selected.cytokine.profiles.permute[,c("subject_id","outcome")])
+  subject.outcome$permuted.outcome <- sample(subject.outcome$outcome,nrow(subject.outcome))
+  selected.cytokine.profiles.permute$outcome <- subject.outcome[match(selected.cytokine.profiles.permute$subject_id,subject.outcome$subject_id),
+                                                                "permuted.outcome"]
+  #return(selected.cytokine.profiles.permute)
+  
+  # leave-one-out modeling
+  sample.scores <- data.frame()
+  feature.importance <- data.frame()
+  selected.cytokine.profiles.permute$outcome.numerical <- 0
+  selected.cytokine.profiles.permute[selected.cytokine.profiles.permute$outcome == "Deceased",]$outcome.numerical <- 1
+  for (i in unique(selected.cytokine.profiles.matrix$subject_id)) {
+    cat(i,"\n")
+    train.data <- subset(selected.cytokine.profiles.permute,subject_id != i)
+    test.data <- subset(selected.cytokine.profiles.permute,subject_id == i)
+    
+    # feature selection
+    search.results <- juncture.divergent.proteins(train.data,pval.cutoff = 1)
+    
+    # modeling
+    for (s in c("mid","late")) {
+      pls.train.data <- subset(train.data,stage == s)
+      pls.test.data <- subset(test.data,stage == s)
+      # feature selection
+      sig.did.de.df <- subset(search.results$type1,de.pval.1 <= 0.05 & 
+                                   did.pval.test.intervalTRUE.outcomeDeceased <= 0.05 & stage == s) # DE & sig. delta 
+      if (nrow(pls.test.data) > 0 & nrow(pls.train.data) > 0 & nrow(sig.did.de.df) > 0) {
+        modpls2 <-plsRglm(dataY=pls.train.data$outcome.numerical,dataX=pls.train.data[,sig.did.de.df$cytokine,drop=F],
+                          nt=1,modele="pls-glm-logistic",pvals.expli = T,
+                          dataPredictY = pls.test.data[,sig.did.de.df$cytokine,drop=F],sparse = F,verbose = T)
+        if (is.numeric(modpls2$ValsPredictY)) {
+          sample.scores <- rbind(sample.scores,data.frame(round=j,stage=s,sample=pls.test.data[,
+                                                        c("subject_id","days_from_symptom_onset_to_test","stage","outcome")],
+                                                        predicted=modpls2$ValsPredictY,
+                                                        observed=pls.test.data[,"outcome.numerical"]))
+          feature.importance <- dplyr::bind_rows(feature.importance,data.frame(round=j,stage=s,t(modpls2$Std.Coeffs)))
+        }
+      }
+    }
+  }
+  res <- list(scores=sample.scores,features=feature.importance)
+  return(res)
+},mc.cores=num.workers)
+
+permuted.auc <- lapply(1:length(protein.search.res.permuted),function(x){
+  cat(x,"\n")
+  if (class(protein.search.res.permuted[[x]]) != "try-error") {
+    permuted.scores <- protein.search.res.permuted[[x]]$scores
+    roc.auc <- c("mid"=NA,"late"=NA)
+    for (s in unique(permuted.scores$stage)) {
+      true.scores <- subset(sample.scores,stage == s)
+      round.scores <- subset(permuted.scores,stage == s)
+      true.scores <- merge(true.scores,round.scores[,c("sample.subject_id","sample.days_from_symptom_onset_to_test","predicted","observed")],
+                           by = c("sample.subject_id","sample.days_from_symptom_onset_to_test"),all.x=T,suffixes=c("",".perm"))
+      # default to score of 0.5 when no model is created
+      true.scores[is.na(true.scores$predicted.perm),"predicted.perm"] <- 0.5
+      auc <- evalmod(scores = true.scores$predicted.perm,labels = true.scores$observed)
+      roc.auc[s] <- attr(auc$rocs[[1]],"auc")
+    }
+    return(roc.auc)
+  } else {
+    cat("error!\n")
+  }
+})
+
+permuted.mid.auc <- sapply(permuted.auc,function(x){x["mid"]})
+cat("P-value for juncture samples:",sum(permuted.mid.auc > attr(precrec_obj_mid$rocs[[1]],"auc"),na.rm = T)/num.perm)
+permuted.late.auc <- sapply(permuted.auc,function(x){x["late"]})
+cat("P-value for post-juncture samples:",sum(permuted.late.auc > attr(precrec_obj_late$rocs[[1]],"auc"),na.rm = T)/num.perm)
+
+```
+
+### Session Info
+```{r save}
+stopCluster(cl)
+sessionInfo()
+```
