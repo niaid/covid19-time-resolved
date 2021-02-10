@@ -1,7 +1,6 @@
-# Time Resolved Multimodal Single Cell Analyses of COVID-19 Reveal Disease Severity Network and Late Immune Response Juncture
+# Time-resolved Systems Immunology Reveals a Late Juncture Linked to Fatal COVID-19
 
-This repository consists of scripts and workflows used for generating results, figures, and tables published in the article: Can Liu, Andrew J. Martins, William W. Lau, Nicholas Rachmaninoff, ..., John S. Tsang. "Longitudinal Time Resolved Multimodal Single Cell Analyses of COVID-19 Reveal Disease Severity Network and Critical Late Immune Response Juncture" Cell (2021), in press.
-
+This repository consists of scripts and workflows used for generating results, figures, and tables published in the article: Can Liu, Andrew J. Martins, William W. Lau, Nicholas Rachmaninoff, ..., John S. Tsang. "Time-resolved Systems Immunology Reveals a Late Juncture Linked to Fatal COVID-19". Cell (2021). https://doi.org/10.1016/j.cell.2021.02.018
 
 ### Instructions
 
