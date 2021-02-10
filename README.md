@@ -1,6 +1,6 @@
 # Time Resolved Multimodal Single Cell Analyses of COVID-19 Reveal Disease Severity Network and Late Immune Response Juncture
 
-This repository consists of scripts and workflows used for generating results, figures, and tables published in the article: Can Liu, Andrew J. Martins, William W. Lau, Nicholas Rachmaninoff, ..., John S. Tsang. "Longitudinal Time Resolved Multimodal Single Cell Analyses of COVID-19 Reveal Disease Severity Network and Critical Late Immune Response Juncture" In review.
+This repository consists of scripts and workflows used for generating results, figures, and tables published in the article: Can Liu, Andrew J. Martins, William W. Lau, Nicholas Rachmaninoff, ..., John S. Tsang. "Longitudinal Time Resolved Multimodal Single Cell Analyses of COVID-19 Reveal Disease Severity Network and Critical Late Immune Response Juncture" Cell (2021), in press.
 
 
 ### Instructions
@@ -10,7 +10,7 @@ Please use the table in the Figures.Tables_Code_Key.pdf file to determine the co
 
 ### Terms of Use
 
-By using this software, you agree this software is to be used for research purposes only. Any presentation of data analysis using dsb will acknowledge the software according to the guidelines below. 
+By using this software, you agree this software is to be used for research purposes only. Any presentation of data analysis using the software will acknowledge the software according to the guidelines below. 
 
 Primary author(s): Can Liu, Andrew J. Martins, William W. Lau, Nicholas Rachmaninoff
 
