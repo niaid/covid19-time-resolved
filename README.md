@@ -2,6 +2,10 @@
 
 This repository consists of scripts and workflows used for generating results, figures, and tables published in the article: Can Liu, Andrew J. Martins, William W. Lau, Nicholas Rachmaninoff, ..., John S. Tsang. "Time-resolved Systems Immunology Reveals a Late Juncture Linked to Fatal COVID-19". Cell (2021). https://doi.org/10.1016/j.cell.2021.02.018
 
+Manuscript with supplemental figures can be downloaded [here](https://github.com/niaid/covid19-time-resolved/raw/main/docs/CELL-D-20-03388%20manuscript%20final%20020321.pdf).
+
+<img src="https://github.com/niaid/covid19-time-resolved/raw/main/docs/Graphical_Abstract.jpg" width=400 height=400>
+
 ### Instructions
 
 Please use the table in the Figures.Tables_Code_Key.pdf file to determine the code used for specific figures and tables. Refer to the README file in each main analysis folder for further details.
