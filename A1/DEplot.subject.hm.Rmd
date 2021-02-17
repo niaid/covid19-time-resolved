@@ -15,6 +15,7 @@ library(ComplexHeatmap)
 library(pheatmap)
 library(circlize)
 source("util_fun/subject.LE.hm.funs.R")
+source("pseudobulk.normalize.esetlist.R")
 ```
 
 
@@ -288,9 +289,10 @@ p <- Heatmap(pheatmap:::scale_rows(pDC_mtx_union), name = paste("pDC", "apopt", 
 p
 # dev.off()
 ```
-  
+
 
 ```{r}
 sI <- sessionInfo()
 utils:::print.sessionInfo(sI[-c(10,11)])
 ```
+

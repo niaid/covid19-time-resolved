@@ -13,7 +13,7 @@ library(ggrepel)
 ```
 
 ## Effect size (NES) of early (TSO < d17) and mid (TSO d17-23) time periods
-**Generate Figure 6C**  
+**Generate Figure 5C**  
 
 read in enrichment results tables and filter selected pathways for each celltype
 Enrichment results from PC1/DSM and days_since_onset group interaction model reflecting the difference of DSM high and low group in early and mid time periods  
@@ -82,5 +82,4 @@ p
 sI <- sessionInfo()
 utils:::print.sessionInfo(sI[-c(10,11)])
 ```
-
 

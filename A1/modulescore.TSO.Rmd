@@ -20,7 +20,7 @@ source("util_fun/plot.gsva.score.TSO.R")
 
 
 ## Geneset enrichment gsva score with TSO
-**Generate Figure 3 D; Figure 4 J,K; Figure 6 E; Figure S3 D**  
+**Generate Figure 3 D; Figure 4 J,K; Figure 5 E; Figure S3 D**  
 Scores were calculated based on LE genes for each comparison group (see score generation scripts)  
 ```{r input}
 ### use the score of LE

@@ -17,10 +17,11 @@ source("util_fun/cellfreq.funs.R")
 ```
 
 ## compare flow and citeseq gate_group_merged data (independednt gated cell populations)
-** Generate Figure S2A **
+Download the Seurat object first and put it into input folder and read-in using the commented codes
+**Generate Figure S2A**
 ```{r input_cite}
-# get the Seurat object for gated cell subsets frequencies
-# merge <- readRDS("input/2020_08_09.rmBuffSHD8.allcelltypelabels.merge.SNG.wmeta.WithinBatchClustered.Rds")
+# read in the Seurat object for gated cell subsets frequencies 
+# merge <- readRDS("input/brescia_paper1_seurat.rds")
 # merge.UnSort <- subset(merge, subset = Sorted == "N")
 
 # merge_cell_UnSort_gate_merged <- data.frame(table(merge.UnSort$sample_id, merge.UnSort$gate_group_merged)) %>% dplyr::group_by(Var1) %>% dplyr::mutate(ratio = Freq/sum(Freq))

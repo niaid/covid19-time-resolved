@@ -19,7 +19,7 @@ source("util_fun/cellfreq.funs.R")
   
 
 ## plot cell frequency of unsorted CITEseq data
-**Generate Figure 6A; Figure S2A, S2B, S2C**   
+**Generate Figure 5A; Figure S2A, S2B, S2C**   
 
 ### Take interested populations from statistical model test and plot together
 **set1 as days_since_onset, set2 as PC1class, set3 for heatmap**  
@@ -51,7 +51,7 @@ final_cell_freq_UnSort_mtx <- final_cell_freq_UnSort_mtx %>% filter(Subject != "
 ```
   
 
-### set1 Fig6
+### set1 Fig5
 ```{r, fig.width=7.5, fig.height=5}
 final_cell_freq_UnSort_mtx_main_set1 <- select(final_cell_freq_UnSort_mtx, all_of(main_set1),
                                                colnames(final_cell_freq_UnSort_mtx)[1:10])
@@ -59,7 +59,7 @@ final_cell_freq_UnSort_main_set1 <- final_cell_freq_UnSort_mtx_main_set1 %>%
   melt(id = c("Var1", "Timepoint", "sample_id", "Batch", "severity", 
               "days_since_symptoms_onset","PC1","PC1class","Subject","severity_outcome")) 
 
-p <- plot5cat(final_cell_freq_UnSort_main_set1, "Fig6.main", "all.set1", width = 7.5, height = 5)
+p <- plot5cat(final_cell_freq_UnSort_main_set1, "Fig5.main", "all.set1", width = 7.5, height = 5)
 # plot timecourse here
 p[[3]]
 ```

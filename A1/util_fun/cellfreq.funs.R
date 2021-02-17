@@ -32,7 +32,7 @@ addcellmeta <- function(df){
   
   df$days_since_symptoms_onset <- plyr::mapvalues(x = df$sample_id, 
                                                   from = covid19.samples.pbmc$sample_id, 
-                                                  to = covid19.samples.pbmc$days_between_sample_drawn_and_symptom_onset)
+                                                  to = covid19.samples.pbmc$days_from_symptom_onset_to_sample_drawn)
   df$days_since_symptoms_onset <- as.character(df$days_since_symptoms_onset)
   df$days_since_symptoms_onset <- as.numeric(replace(df$days_since_symptoms_onset, 
                                                      df$Timepoint == "HC", 0))
